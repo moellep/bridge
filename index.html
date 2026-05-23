@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bridge</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 20px; }
+body { background: #1a6b3a; font-family: 'Segoe UI', sans-serif; color: #fff; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+
+#header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 16px; background: rgba(0,0,0,0.3);
+}
+#header h1 { font-size: 1.2rem; letter-spacing: 2px; }
+#score-display { font-size: 0.9rem; }
+#score-display span { margin: 0 8px; background: rgba(255,255,255,0.15); padding: 2px 10px; border-radius: 4px; }
+
+#table {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  grid-template-columns: 1fr;
+  flex: 1;
+  min-height: 0;
+  gap: 4px;
+  padding: 8px;
+}
+
+#north-area, #south-area {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+}
+#middle-row {
+  display: grid;
+  grid-template-columns: 140px 1fr 140px;
+  gap: 8px;
+  overflow: hidden;
+  align-items: start;
+}
+#center-column {
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+}
+#west-area, #east-area {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding-top: 20px;
+}
+.player-label {
+  font-size: 0.75rem; color: rgba(255,255,255,0.7); letter-spacing: 1px; text-transform: uppercase;
+}
+.hcp-badge {
+  display: inline-block; background: rgba(255,255,255,0.2);
+  border-radius: 3px; padding: 0 5px; font-size: 0.7rem; margin-left: 4px;
+}
+
+.hand {
+  display: flex; flex-wrap: wrap; gap: 3px; justify-content: center;
+}
+.hand.vertical { flex-direction: column; align-items: center; }
+
+.card {
+  background: #fff; color: #000; border-radius: 5px;
+  padding: 4px 6px; font-size: 0.85rem; font-weight: bold;
+  cursor: default; user-select: none; width: 44px; text-align: center;
+  box-shadow: 1px 1px 3px rgba(0,0,0,0.3);
+  border: 2px solid transparent;
+  transition: transform 0.1s, border-color 0.1s;
+}
+.card.playable { cursor: pointer; border-color: #ffe066; }
+.card.playable:hover { transform: translateY(-6px); border-color: #ffd700; }
+.card.back { background: #1a3a8a; color: #1a3a8a; }
+.card.dummy-card { border-color: #aaffaa; }
+
+#center {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 8px;
+}
+
+#status-msg {
+  font-size: 0.85rem; color: #ffe066; min-height: 18px; text-align: center;
+}
+#contract-display {
+  font-size: 1rem; font-weight: bold; letter-spacing: 1px; min-height: 24px; text-align: center;
+}
+
+/* Trick display */
+#trick-area {
+  width: 220px; height: 160px; position: relative;
+  background: rgba(0,0,0,0.2); border-radius: 8px;
+}
+.trick-slot { position: absolute; }
+.trick-slot.n { top: 8px; left: 50%; transform: translateX(-50%); }
+.trick-slot.e { right: 8px; top: 50%; transform: translateY(-50%); }
+.trick-slot.s { bottom: 8px; left: 50%; transform: translateX(-50%); }
+.trick-slot.w { left: 8px; top: 50%; transform: translateY(-50%); }
+.trick-count { position: absolute; bottom: 4px; right: 6px; font-size: 0.7rem; color: rgba(255,255,255,0.6); }
+
+/* Auction table */
+#auction-table { width: 220px; background: rgba(0,0,0,0.25); border-radius: 6px; overflow: hidden; }
+#auction-table table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+#auction-table th { background: rgba(0,0,0,0.3); padding: 4px; text-align: center; }
+#auction-table td { padding: 3px 5px; text-align: center; border-top: 1px solid rgba(255,255,255,0.08); }
+
+/* Bid box */
+#bid-box { display: none; }
+.bid-grid {
+  display: grid; grid-template-columns: repeat(5, 42px); gap: 3px; margin-bottom: 6px;
+}
+.bid-btn {
+  background: #fff; border: none; border-radius: 4px; padding: 5px 0;
+  font-size: 0.8rem; font-weight: bold; cursor: pointer;
+  transition: background 0.1s;
+}
+.bid-btn:hover:not(:disabled) { background: #ffe066; }
+.bid-btn:disabled { background: #ccc; cursor: default; opacity: 0.5; }
+.bid-btn.club    { border-left: 3px solid #333; }
+.bid-btn.diamond { border-left: 3px solid #d00; }
+.bid-btn.heart   { border-left: 3px solid #d00; }
+.bid-btn.spade   { border-left: 3px solid #333; }
+.bid-btn.nt      { border-left: 3px solid #3366cc; }
+.bid-actions { display: flex; gap: 4px; justify-content: center; }
+.pass-btn { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.4); color: #fff; border-radius: 4px; padding: 5px 20px; cursor: pointer; font-size: 0.85rem; }
+.pass-btn:hover { background: rgba(255,255,255,0.25); }
+
+/* Controls */
+#controls { text-align: center; padding: 4px 0; }
+#new-game-btn {
+  background: #ffe066; color: #333; border: none; border-radius: 5px;
+  padding: 7px 20px; font-size: 0.85rem; font-weight: bold; cursor: pointer;
+}
+#new-game-btn:hover { background: #ffd700; }
+
+/* Message overlay */
+#message-overlay {
+  display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%);
+  background: rgba(0,0,0,0.85); color: #fff; border-radius: 10px;
+  padding: 24px 36px; text-align: center; z-index: 100; min-width: 260px;
+}
+#message-overlay h2 { margin-bottom: 10px; font-size: 1.3rem; }
+#message-overlay p  { font-size: 0.95rem; color: #aaa; margin-bottom: 16px; }
+#message-overlay button { background: #ffe066; color: #333; border: none; border-radius: 5px; padding: 8px 24px; cursor: pointer; font-weight: bold; }
+</style>
+</head>
+<body>
+
+<div id="header">
+  <h1>♣ BRIDGE ♦</h1>
+  <div id="score-display">
+    <span>NS: <b id="ns-score">0</b></span>
+    <span>EW: <b id="ew-score">0</b></span>
+  </div>
+  <div id="controls">
+    <label style="font-size:0.75rem;cursor:pointer;margin-right:12px;user-select:none;">
+      <input type="checkbox" id="show-all-cb"> Show all hands
+    </label>
+    <button id="new-game-btn">New Deal</button>
+  </div>
+</div>
+
+<div id="table">
+  <div id="north-area">
+    <div class="player-label">North <span class="hcp-badge" id="n-hcp"></span></div>
+    <div id="north-hand" class="hand"></div>
+  </div>
+  <div id="middle-row">
+    <div id="west-area">
+      <div class="player-label">West <span class="hcp-badge" id="w-hcp"></span></div>
+      <div id="west-hand" class="hand vertical"></div>
+    </div>
+    <div id="center-column">
+      <div id="center">
+        <div id="contract-display"></div>
+        <div id="trick-area">
+          <div class="trick-slot n" id="trick-n"></div>
+          <div class="trick-slot e" id="trick-e"></div>
+          <div class="trick-slot s" id="trick-s"></div>
+          <div class="trick-slot w" id="trick-w"></div>
+          <div class="trick-count" id="trick-count"></div>
+        </div>
+        <div id="auction-table"></div>
+        <div id="bid-box"></div>
+        <div id="status-msg"></div>
+      </div>
+      <div id="south-area">
+        <div id="south-hand" class="hand"></div>
+        <div class="player-label">South — You <span class="hcp-badge" id="s-hcp"></span></div>
+      </div>
+    </div>
+    <div id="east-area">
+      <div class="player-label">East <span class="hcp-badge" id="e-hcp"></span></div>
+      <div id="east-hand" class="hand vertical"></div>
+    </div>
+  </div>
+</div>
+
+<div id="message-overlay">
+  <h2 id="msg-title"></h2>
+  <p id="msg-body"></p>
+  <div style="display:flex;gap:10px;justify-content:center;">
+    <button onclick="replayHand()">Replay Hand</button>
+    <button onclick="dismissMessage()">New Deal</button>
+  </div>
+</div>
+
+<script src="bridge.js"></script>
+<script src="ui.js"></script>
+</body>
+</html>
