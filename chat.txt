@@ -1,0 +1,2006 @@
+ ▐▛███▜▌   Claude Code v2.1.145
+▝▜█████▛▘  Sonnet 4.6 · Claude Pro
+  ▘▘ ▝▝    ~/src/moellep/bridge
+
+✻ Conversation compacted (ctrl+o for history)
+
+
+❯ /compact
+  ⎿  Compacted (ctrl+o to see full summary)
+  ⎿  Referenced file index.html
+  ⎿  Read bidding.md (361 lines)
+
+❯ separate out javascript into separate files. one for ui. one for business
+  logic
+
+● Let me read the current index.html to plan the split.
+
+  Read 1 file (ctrl+o to expand)
+
+● I'll split it into bridge.js (pure logic, no DOM) and ui.js (game state,
+  rendering, events), with index.html holding only HTML/CSS.
+
+● Write(bridge.js)
+  ⎿  Wrote 297 lines to bridge.js
+      2 'use strict';
+      3 // ── Constants ─────────────────────────────────────────────────
+        ─────────────────
+      4 const SYM   = ['♣','♦','♥','♠'];
+      5 const SNAME = ['Clubs','Diamonds','Hearts','Spades','NT'];
+      6 const SCOL  = ['#222','#c00','#c00','#222'];
+      7 const RNAME = ['','','2','3','4','5','6','7','8','9','10','J','Q'
+        ,'K','A'];
+      8 const PNAME = ['North','East','South','West'];
+      9 // Player indices: N=0 E=1 S=2 W=3   Suits: ♣=0 ♦=1 ♥=2 ♠=3 NT=4
+     … +319 lines (ctrl+o to expand)
+
+● Write(ui.js)
+  ⎿  Wrote 298 lines to ui.js
+       2 'use strict';
+       3 // ── Game state ───────────────────────────────────────────────
+         ──────────────────
+       4 let G = null;
+       5
+       6 function newGame() {
+       7   G = {
+       8     phase: 'bidding',
+       9     hands: deal(),
+      10     dealer: 0,
+     … +318 lines (ctrl+o to expand)
+
+● Now rewrite index.html to just HTML + CSS + script tags:
+
+● Write(index.html)
+  ⎿  Added 2 lines, removed 636 lines
+      185    <button onclick="dismissMessage()">Continue</button>
+      186  </div>
+      187  
+      188 -<script>                                                      
+      189 -'use strict';                                                 
+      190 -                                                              
+      191 -// ── Constants ──────────────────────────────────────────────
+          -────────────────────                                          
+      192 -const SYM   = ['♣','♦','♥','♠'];                              
+      193 -const SNAME = ['Clubs','Diamonds','Hearts','Spades','NT'];    
+      194 -const SCOL  = ['#222','#c00','#c00','#222'];                  
+      195 -const RNAME = ['','','2','3','4','5','6','7','8','9','10','J',
+          -'Q','K','A'];                                                 
+      196 -const PNAME = ['North','East','South','West'];                
+      197 -// Player indices: N=0 E=1 S=2 W=3   Suits: ♣=0 ♦=1 ♥=2 ♠=3 NT
+          -=4                                                            
+      198 -                                                              
+      199 -// ── Card utilities ─────────────────────────────────────────
+          -────────────────────                                          
+      200 -const card  = (rank, suit) => ({rank, suit});                 
+      201 -const cstr  = c => RNAME[c.rank] + SYM[c.suit];               
+      202 -const hcp   = c => c.rank >= 11 ? c.rank - 10 : 0;            
+      203 -const hHCP  = h => h.reduce((s,c) => s + hcp(c), 0);          
+      204 -const sSuit = (h,s) => h.filter(c => c.suit === s);           
+      205 -const sLen  = (h,s) => sSuit(h,s).length;                     
+      206 -                                                              
+      207 -function distPts(hand) {                                      
+      208 -  let p = 0;                                                  
+      209 -  for (let s = 0; s < 4; s++) { const l = sLen(hand,s); if (l=
+          -==0) p+=3; else if(l===1) p+=2; else if(l===2) p+=1; }        
+      210 -  return p;                                                   
+      211 -}                                                             
+      212 -const totPts = h => hHCP(h) + distPts(h);                     
+      213 -                                                              
+      214 -function isBalanced(h) {                                      
+      215 -  const lens = [0,1,2,3].map(s=>sLen(h,s)).sort((a,b)=>a-b);  
+      216 -  return lens[0] >= 2; // no singleton or void                
+      217 -}                                                             
+      218 -                                                              
+      219 -// ── Deck ───────────────────────────────────────────────────
+          -────────────────────                                          
+      220 -function makeDeck() {                                         
+      221 -  const d = [];                                               
+      222 -  for (let s=0;s<4;s++) for(let r=2;r<=14;r++) d.push(card(r,s
+          -));                                                           
+      223 -  return d;                                                   
+      224 -}                                                             
+      225 -function shuffle(a) {                                         
+      226 -  for(let i=a.length-1;i>0;i--){const j=0|Math.random()*(i+1);
+          -[a[i],a[j]]=[a[j],a[i]];}                                     
+      227 -  return a;                                                   
+      228 -}                                                             
+      229 -function deal() {                                             
+      230 -  const deck = shuffle(makeDeck());                           
+      231 -  return [0,1,2,3].map(p => sortHand(deck.slice(p*13,(p+1)*13)
+          -));                                                           
+      232 -}                                                             
+      233 -function sortHand(h) {                                        
+      234 -  // Sort by suit desc (♠♥♦♣), within suit by rank desc       
+      235 -  return [...h].sort((a,b) => a.suit!==b.suit ? b.suit-a.suit 
+          -: b.rank-a.rank);                                             
+      236 -}                                                             
+      237 -                                                              
+      238 -// ── Bid utilities ──────────────────────────────────────────
+          -────────────────────                                          
+      239 -// ROM encoding: bid_value = (level-1)*8 + suit  (♣=0 ♦=1 ♥=2 
+          -♠=3 NT=4)                                                     
+      240 -const bVal  = b => b.pass ? -1 : (b.level-1)*8 + b.suit;      
+      241 -const beats = (b, cur) => !cur || bVal(b) > bVal(cur);        
+      242 -const PASS  = () => ({pass:true});                            
+      243 -const mkBid = (level,suit) => ({level,suit,pass:false});      
+      244 -                                                              
+      245 -function highestBid(auction) {                                
+      246 -  for(let i=auction.length-1;i>=0;i--) {                      
+      247 -    const b = auction[i].bid;                                 
+      248 -    if(!b.pass) return b;                                     
+      249 -  }                                                           
+      250 -  return null;                                                
+      251 -}                                                             
+      252 -                                                              
+      253 -// Who first bid the trump suit from the winning side?        
+      254 -function findDeclarer(auction, suit, side) {                  
+      255 -  for(const {player, bid} of auction)                         
+      256 -    if(player%2===side && !bid.pass && bid.suit===suit) return
+          - player;                                                      
+      257 -  return -1;                                                  
+      258 -}                                                             
+      259 -                                                              
+      260 -// ── AI: hand evaluation helpers ────────────────────────────
+          -────────────────────                                          
+      261 -function bestSuit(h) {                                        
+      262 -  // Prefer majors (♠=3 ♥=2); among same length prefer higher 
+          -HCP                                                           
+      263 -  let best=-1, bLen=0, bHCP=0;                                
+      264 -  for(let s=3;s>=0;s--) {                                     
+      265 -    const l=sLen(h,s), hp=sSuit(h,s).reduce((x,c)=>x+hcp(c),0)
+          -;                                                             
+      266 -    if(l>bLen||(l===bLen&&hp>bHCP)){best=s;bLen=l;bHCP=hp;}   
+      267 -  }                                                           
+      268 -  return best;                                                
+      269 -}                                                             
+      270 -                                                              
+      271 -function suitQuality(h,s) {                                   
+      272 -  // Returns length + fractional bonus for honors             
+      273 -  return sLen(h,s) + sSuit(h,s).reduce((x,c)=>x+hcp(c),0)*0.1;
+      274 -}                                                             
+      275 -                                                              
+      276 -// ── AI bidding (faithful to ROM thresholds) ────────────────
+          -────────────────────                                          
+      277 -function aiBid(state, player) {                               
+      278 -  const h    = state.hands[player];                           
+      279 -  const myHP = hHCP(h);                                       
+      280 -  const myP  = totPts(h);                                     
+      281 -  const pard = (player+2)%4;                                  
+      282 -  const auc  = state.auction;                                 
+      283 -  const high = highestBid(auc);                               
+      284 -                                                              
+      285 -  const myBids   = auc.filter(x=>x.player===player  && !x.bid.
+          -pass);                                                        
+      286 -  const pardBids = auc.filter(x=>x.player===pard    && !x.bid.
+          -pass);                                                        
+      287 -  const oppBids  = auc.filter(x=>x.player%2!==player%2 && !x.b
+          -id.pass);                                                     
+      288 -                                                              
+      289 -  function tryBid(level, suit) {                              
+      290 -    const b = mkBid(level,suit);                              
+      291 -    return beats(b,high) ? b : null;                          
+      292 -  }                                                           
+      293 -                                                              
+      294 -  // ── Opening bid (no bids yet) ────────────────────────────
+          -──────────────────                                            
+      295 -  if (!high) {                                                
+      296 -    if (myP < 13) return PASS();                              
+      297 -    if (myHP >= 20 && myHP <= 21 && isBalanced(h)) return tryB
+          -id(2,4)||PASS();                                              
+      298 -    if (myHP >= 15 && myHP <= 17 && isBalanced(h)) return tryB
+          -id(1,4)||PASS();                                              
+      299 -    const s = bestSuit(h);                                    
+      300 -    return tryBid(1,s) || PASS();                             
+      301 -  }                                                           
+      302 -                                                              
+      303 -  // ── Response to partner's opening ────────────────────────
+          -─────────────────                                             
+      304 -  if (pardBids.length===1 && myBids.length===0 && oppBids.leng
+          -th===0) {                                                     
+      305 -    const pBid = pardBids[0].bid;                             
+      306 -                                                              
+      307 -    // Response to 1NT (15-17 HCP balanced)                   
+      308 -    if (pBid.suit===4 && pBid.level===1) {                    
+      309 -      if (myHP <= 7)  return PASS();                          
+      310 -      if (myHP >= 10) {                                       
+      311 -        if (sLen(h,3)>=4) return tryBid(4,3)||tryBid(3,4)||PAS
+          -S();                                                          
+      312 -        if (sLen(h,2)>=4) return tryBid(4,2)||tryBid(3,4)||PAS
+          -S();                                                          
+      313 -        return tryBid(3,4)||PASS();                           
+      314 -      }                                                       
+      315 -      return tryBid(2,4)||PASS();                             
+      316 -    }                                                         
+      317 -                                                              
+      318 -    // Response to 2NT (20-21 HCP balanced)                   
+      319 -    if (pBid.suit===4 && pBid.level===2) {                    
+      320 -      if (myHP <= 3)  return PASS();                          
+      321 -      if (myHP >= 5) {                                        
+      322 -        if (sLen(h,3)>=5) return tryBid(4,3)||tryBid(3,4)||PAS
+          -S();                                                          
+      323 -        if (sLen(h,2)>=5) return tryBid(4,2)||tryBid(3,4)||PAS
+          -S();                                                          
+      324 -        return tryBid(3,4)||PASS();                           
+      325 -      }                                                       
+      326 -      return PASS();                                          
+      327 -    }                                                         
+      328 -                                                              
+      329 -    // Response to suit opening                               
+      330 -    const ps = pBid.suit;                                     
+      331 -    if (myP >= 13) {                                          
+      332 -      // Game force: raise to game, or show new suit, or 3NT  
+      333 -      if (sLen(h,3)>=4 && ps!==3) return tryBid(4,3)||tryBid(3
+          -,4)||PASS();                                                  
+      334 -      if (sLen(h,2)>=4 && ps!==2) return tryBid(4,2)||tryBid(3
+          -,4)||PASS();                                                  
+      335 -      if (sLen(h,ps)>=3) return tryBid(ps>=2?4:5, ps)||tryBid(
+          -3,4)||PASS();                                                 
+      336 -      const ns = bestSuit(h);                                 
+      337 -      return tryBid(2,ns)||tryBid(3,4)||PASS();               
+      338 -    }                                                         
+      339 -    if (myP >= 10) {                                          
+      340 -      // Invitational                                         
+      341 -      if (sLen(h,ps)>=3) return tryBid(3,ps)||PASS();         
+      342 -      if (myHP>=10) return tryBid(2,4)||PASS();               
+      343 -      const ns = bestSuit(h);                                 
+      344 -      return tryBid(ns>ps?1:2, ns)||PASS();                   
+      345 -    }                                                         
+      346 -    if (myP >= 6) {                                           
+      347 -      // Minimum response: raise 1 or bid new suit at 1 level 
+      348 -      const ns = bestSuit(h);                                 
+      349 -      if (sLen(h,ps)>=3) return tryBid(2,ps)||PASS();         
+      350 -      if (ns > ps) return tryBid(1,ns)||PASS();               
+      351 -      return tryBid(2,ns)||PASS();                            
+      352 -    }                                                         
+      353 -    return PASS();                                            
+      354 -  }                                                           
+      355 -                                                              
+      356 -  // ── Rebid (partner responded to our opening) ─────────────
+          -──────────────────                                            
+      357 -  if (myBids.length===1 && pardBids.length===1) {             
+      358 -    const pResp = pardBids[0].bid;                            
+      359 -    if (!pResp || pResp.pass) return PASS();                  
+      360 -    if (myHP >= 18) {                                         
+      361 -      const s = bestSuit(h);                                  
+      362 -      if (sLen(h,s)>=5) return tryBid(s>=2?4:5, s)||tryBid(3,4
+          -)||PASS();                                                    
+      363 -      return tryBid(2,4)||tryBid(3,4)||PASS();                
+      364 -    }                                                         
+      365 -    if (isBalanced(h) && myHP >= 15) return tryBid(1,4)||tryBi
+          -d(2,4)||PASS();                                               
+      366 -    const s = bestSuit(h);                                    
+      367 -    if (sLen(h,s)>=6) return tryBid(2,s)||PASS();             
+      368 -    // Jump to game with fit                                  
+      369 -    if (!pResp.pass && sLen(h,pResp.suit||s)>=4 && myP>=16) { 
+      370 -      const gs = pResp.suit||s;                               
+      371 -      return tryBid(gs>=2?4:5, gs)||PASS();                   
+      372 -    }                                                         
+      373 -    return PASS();                                            
+      374 -  }                                                           
+      375 -                                                              
+      376 -  // ── Overcall (opponent opened, we haven't bid) ───────────
+          -─────────────────                                             
+      377 -  if (oppBids.length>0 && myBids.length===0 && pardBids.length
+          -===0) {                                                       
+      378 -    if (myHP < 10) return PASS();                             
+      379 -    const s = bestSuit(h);                                    
+      380 -    if (sLen(h,s) < 5) return PASS();                         
+      381 -    return tryBid(high.level, s)||tryBid(high.level+1, s)||PAS
+          -S();                                                          
+      382 -  }                                                           
+      383 -                                                              
+      384 -  // ── Slam try ─────────────────────────────────────────────
+          -────────────────                                              
+      385 -  if (myBids.length>=1 && pardBids.length>=1 && high && high.l
+          -evel>=4) {                                                    
+      386 -    const est = myHP + 13; // rough partner estimate          
+      387 -    if (est >= 33 && high.level<6) {                          
+      388 -      return tryBid(6, high.suit)||PASS();                    
+      389 -    }                                                         
+      390 -  }                                                           
+      391 -                                                              
+      392 -  // ── Blackwood 4NT response ───────────────────────────────
+          -─────────────────                                             
+      393 -  if (high && high.suit===4 && high.level===4 && high === (par
+          -dBids.length?pardBids[pardBids.length-1].bid:null)) {         
+      394 -    // Partner bid 4NT asking for aces                        
+      395 -    const aces = h.filter(c=>c.rank===14).length;             
+      396 -    const responses = [mkBid(5,0),mkBid(5,1),mkBid(5,2),mkBid(
+          -5,3)]; // 5♣=0,5♦=1,5♥=2,5♠=3                                 
+      397 -    return responses[aces] || responses[3];                   
+      398 -  }                                                           
+      399 -                                                              
+      400 -  return PASS();                                              
+      401 -}                                                             
+      402 -                                                              
+      403 -// ── Card play AI ───────────────────────────────────────────
+          -────────────────────                                          
+      404 -function aiPlay(state, player) {                              
+      405 -  const h      = state.hands[player];                         
+      406 -  const trick  = state.currentTrick;                          
+      407 -  const trump  = state.contract.suit < 4 ? state.contract.suit
+          - : -1;                                                        
+      408 -  const isDecl = player === state.contract.declarer;          
+      409 -  const pard   = (player+2)%4;                                
+      410 -                                                              
+      411 -  // Determine legal plays                                    
+      412 -  let legal;                                                  
+      413 -  if (trick.length === 0) {                                   
+      414 -    legal = [...h];                                           
+      415 -  } else {                                                    
+      416 -    const led = trick[0].card.suit;                           
+      417 -    const onSuit = sSuit(h, led);                             
+      418 -    legal = onSuit.length > 0 ? onSuit : [...h];              
+      419 -  }                                                           
+      420 -  if (legal.length === 1) return legal[0];                    
+      421 -                                                              
+      422 -  // ── Opening lead (first card of trick) ───────────────────
+          -──────────────────                                            
+      423 -  if (trick.length === 0) {                                   
+      424 -    if (isDecl) {                                             
+      425 -      // Declarer: draw trumps first if trump contract        
+      426 -      if (trump >= 0) {                                       
+      427 -        const ts = sSuit(h, trump);                           
+      428 -        if (ts.length > 0) return ts.sort((a,b)=>a.rank-b.rank
+          -)[0];                                                         
+      429 -      }                                                       
+      430 -    }                                                         
+      431 -    // Lead 4th-best from longest suit (excluding trump)      
+      432 -    const suits = [0,1,2,3].filter(s=>s!==trump);             
+      433 -    suits.sort((a,b) => sLen(h,b)-sLen(h,a) || sSuit(h,b).redu
+          -ce((x,c)=>x+hcp(c),0)-sSuit(h,a).reduce((x,c)=>x+hcp(c),0));  
+      434 -    const best = suits[0] ?? 0;                               
+      435 -    const cs   = sSuit(h, best).sort((a,b)=>b.rank-a.rank);   
+      436 -    if (cs.length === 0) return legal[0];                     
+      437 -    // Top of sequence if touching honors                     
+      438 -    if (cs.length >= 2 && cs[0].rank - cs[1].rank === 1 && cs[
+          -0].rank >= 11) return cs[0];                                  
+      439 -    // 4th best                                               
+      440 -    return cs[Math.min(3, cs.length-1)];                      
+      441 -  }                                                           
+      442 -                                                              
+      443 -  const ledSuit = trick[0].card.suit;                         
+      444 -  const canFol  = sSuit(h, ledSuit).length > 0;               
+      445 -                                                              
+      446 -  if (canFol) {                                               
+      447 -    const fol = sSuit(h, ledSuit).sort((a,b)=>a.rank-b.rank); 
+      448 -    // Third hand high                                        
+      449 -    if (trick.length >= 2) return fol[fol.length-1];          
+      450 -    // Second hand low                                        
+      451 -    return fol[0];                                            
+      452 -  }                                                           
+      453 -                                                              
+      454 -  // Can't follow: maybe trump                                
+      455 -  if (trump >= 0) {                                           
+      456 -    const ts = sSuit(h, trump).sort((a,b)=>a.rank-b.rank);    
+      457 -    if (ts.length > 0) {                                      
+      458 -      // Don't trump if partner already winning               
+      459 -      const pardEntry = trick.find(t=>t.player===pard);       
+      460 -      if (!pardEntry || !isCurrentlyWinning(pardEntry.card, tr
+          -ick, trump)) {                                                
+      461 -        return ts[0]; // lowest trump to ruff                 
+      462 -      }                                                       
+      463 -    }                                                         
+      464 -  }                                                           
+      465 -  // Discard: lowest non-trump                                
+      466 -  const nonT = legal.filter(c=>c.suit!==trump);               
+      467 -  return (nonT.length?nonT:legal).sort((a,b)=>a.rank-b.rank)[0
+          -];                                                            
+      468 -}                                                             
+      469 -                                                              
+      470 -function isCurrentlyWinning(card, trick, trump) {             
+      471 -  for(const {card:c} of trick) {                              
+      472 -    if(c===card) continue;                                    
+      473 -    if(trump>=0 && c.suit===trump && card.suit!==trump) return
+          - false;                                                       
+      474 -    if(c.suit===card.suit && c.rank>card.rank) return false;  
+      475 -  }                                                           
+      476 -  return true;                                                
+      477 -}                                                             
+      478 -                                                              
+      479 -function trickWinner(trick, trump) {                          
+      480 -  let win = trick[0];                                         
+      481 -  for(let i=1;i<trick.length;i++) {                           
+      482 -    const c=trick[i].card, wc=win.card;                       
+      483 -    if(trump>=0 && c.suit===trump && wc.suit!==trump){win=tric
+          -k[i];continue;}                                               
+      484 -    if(c.suit===wc.suit && c.rank>wc.rank) win=trick[i];      
+      485 -  }                                                           
+      486 -  return win.player;                                          
+      487 -}                                                             
+      488 -                                                              
+      489 -// ── Scoring ────────────────────────────────────────────────
+          -────────────────────                                          
+      490 -function scoreContract(contract, tricksMade, vulnerable) {    
+      491 -  const {level, suit, declarer} = contract;                   
+      492 -  const isNS  = declarer%2===0;                               
+      493 -  const isVul = vulnerable[isNS?0:1];                         
+      494 -  const need  = level + 6;                                    
+      495 -                                                              
+      496 -  if (tricksMade < need) {                                    
+      497 -    const down = need - tricksMade;                           
+      498 -    const pen  = isVul ? down*100 : down*50;                  
+      499 -    return isNS ? -pen : pen;                                 
+      500 -  }                                                           
+      501 -                                                              
+      502 -  const over     = tricksMade - need;                         
+      503 -  const perTrick = suit===4 ? 30 : (suit>=2 ? 30 : 20);       
+      504 -  const ntBonus  = suit===4 ? 10 : 0;                         
+      505 -  let trickScore = level * perTrick + ntBonus;                
+      506 -                                                              
+      507 -  let bonus = trickScore >= 100 ? (isVul?500:300) : 50; // gam
+          -e or partscore                                                
+      508 -  if (level===6) bonus += isVul?750:500;                      
+      509 -  if (level===7) bonus += isVul?1500:1000;                    
+      510 -                                                              
+      511 -  const total = trickScore + bonus + over*perTrick;           
+      512 -  return isNS ? total : -total;                               
+      513 -}                                                             
+      514 -                                                              
+      515 -// ── Game state ─────────────────────────────────────────────
+          -────────────────────                                          
+      516 -let G = null;                                                 
+      517 -                                                              
+      518 -function newGame() {                                          
+      519 -  G = {                                                       
+      520 -    phase: 'bidding',                                         
+      521 -    hands: deal(),                                            
+      522 -    dealer: 0,                                                
+      523 -    auction: [],                                              
+      524 -    contract: null,                                           
+      525 -    dummy: -1,                                                
+      526 -    leader: -1,                                               
+      527 -    curPlayer: 0,                                             
+      528 -    curTrick: [],                                             
+      529 -    tricks: [],                                               
+      530 -    tricksNS: 0,                                              
+      531 -    tricksEW: 0,                                              
+      532 -    vulnerable: [false, false],                               
+      533 -    scoresNS: G ? G.scoresNS : 0,                             
+      534 -    scoresEW: G ? G.scoresEW : 0,                             
+      535 -    passCount: 0,                                             
+      536 -    msg: '',                                                  
+      537 -  };                                                          
+      538 -  render();                                                   
+      539 -  setTimeout(advanceBid, 400);                                
+      540 -}                                                             
+      541 -                                                              
+      542 -// ── Bidding flow ───────────────────────────────────────────
+          -────────────────────                                          
+      543 -function advanceBid() {                                       
+      544 -  if (G.phase !== 'bidding') return;                          
+      545 -  if (G.curPlayer === 2) { render(); return; } // human's turn
+          -: wait for click                                              
+      546 -  const bid = aiBid(G, G.curPlayer);                          
+      547 -  applyBid(G.curPlayer, bid);                                 
+      548 -}                                                             
+      549 -                                                              
+      550 -function applyBid(player, bid) {                              
+      551 -  G.auction.push({player, bid});                              
+      552 -  G.passCount = bid.pass ? G.passCount+1 : 0;                 
+      553 -                                                              
+      554 -  const high = highestBid(G.auction);                         
+      555 -  const done = (!high && G.passCount===4) || (high && G.passCo
+          -unt===3);                                                     
+      556 -                                                              
+      557 -  if (done) { endAuction(high); return; }                     
+      558 -                                                              
+      559 -  G.curPlayer = (G.curPlayer+1)%4;                            
+      560 -  render();                                                   
+      561 -  setTimeout(advanceBid, 700);                                
+      562 -}                                                             
+      563 -                                                              
+      564 -function endAuction(high) {                                   
+      565 -  if (!high) {                                                
+      566 -    G.msg = 'All pass — redealing...';                        
+      567 -    render();                                                 
+      568 -    setTimeout(newGame, 1800);                                
+      569 -    return;                                                   
+      570 -  }                                                           
+      571 -  const side     = G.auction.find(x=>!x.bid.pass && x.bid.suit
+          -===high.suit && x.bid.level===high.level)?.player % 2 ?? 0;   
+      572 -  const declarer = findDeclarer(G.auction, high.suit, side);  
+      573 -  G.contract     = {level:high.level, suit:high.suit, declarer
+          -};                                                            
+      574 -  G.dummy        = (declarer+2)%4;                            
+      575 -  G.leader       = (declarer+1)%4;                            
+      576 -  G.curPlayer    = G.leader;                                  
+      577 -  G.phase        = 'playing';                                 
+      578 -  G.msg          = '';                                        
+      579 -  render();                                                   
+      580 -  setTimeout(advancePlay, 900);                               
+      581 -}                                                             
+      582 -                                                              
+      583 -// ── Card play flow ─────────────────────────────────────────
+          -────────────────────                                          
+      584 -function advancePlay() {                                      
+      585 -  if (G.phase !== 'playing') return;                          
+      586 -  const p = G.curPlayer;                                      
+      587 -  // Human plays: South (2), and North dummy (0) if South is d
+          -eclarer                                                       
+      588 -  const humanTurn = p===2 || (p===G.dummy && G.contract.declar
+          -er===2);                                                      
+      589 -  if (humanTurn) { render(); return; }                        
+      590 -  // Computer plays                                           
+      591 -  const c = aiPlay(G, p);                                     
+      592 -  applyPlay(p, c);                                            
+      593 -}                                                             
+      594 -                                                              
+      595 -function applyPlay(player, card) {                            
+      596 -  G.hands[player] = G.hands[player].filter(c=>c!==card);      
+      597 -  G.curTrick.push({player, card});                            
+      598 -                                                              
+      599 -  if (G.curTrick.length === 4) {                              
+      600 -    const trump = G.contract.suit<4 ? G.contract.suit : -1;   
+      601 -    const win   = trickWinner(G.curTrick, trump);             
+      602 -    G.tricks.push({winner:win, cards:G.curTrick});            
+      603 -    if (win%2===0) G.tricksNS++; else G.tricksEW++;           
+      604 -    G.curTrick  = [];                                         
+      605 -    G.curPlayer = win;                                        
+      606 -                                                              
+      607 -    if (G.tricks.length === 13) { endGame(); return; }        
+      608 -    render();                                                 
+      609 -    setTimeout(advancePlay, 1000);                            
+      610 -  } else {                                                    
+      611 -    G.curPlayer = (G.curPlayer+1)%4;                          
+      612 -    render();                                                 
+      613 -    setTimeout(advancePlay, 600);                             
+      614 -  }                                                           
+      615 -}                                                             
+      616 -                                                              
+      617 -function endGame() {                                          
+      618 -  const {level, suit, declarer} = G.contract;                 
+      619 -  const isNS   = declarer%2===0;                              
+      620 -  const made   = isNS ? G.tricksNS : G.tricksEW;              
+      621 -  const pts    = scoreContract(G.contract, made, G.vulnerable)
+          -;                                                             
+      622 -  G.scoresNS  += pts > 0 ? pts : 0;                           
+      623 -  G.scoresEW  += pts < 0 ? -pts : 0;                          
+      624 -  G.phase      = 'done';                                      
+      625 -                                                              
+      626 -  const need   = level+6;                                     
+      627 -  const sStr   = suit===4?'NT':SYM[suit];                     
+      628 -  const declN  = PNAME[declarer];                             
+      629 -  if (made >= need) {                                         
+      630 -    const over = made-need;                                   
+      631 -    showMessage(                                              
+      632 -      `Contract Made!`,                                       
+      633 -      `${level}${sStr} by ${declN} — made ${made} tricks${over
+          -?` (+${over} overtrick${over>1?'s':''})`:''}\n+${Math.abs(pts)
+          -} points to ${isNS?'NS':'EW'}`                                
+      634 -    );                                                        
+      635 -  } else {                                                    
+      636 -    showMessage(                                              
+      637 -      `Down ${need-made}`,                                    
+      638 -      `${level}${sStr} by ${declN} — only ${made} tricks neede
+          -d ${need}\n${Math.abs(pts)} points to ${isNS?'EW':'NS'}`      
+      639 -    );                                                        
+      640 -  }                                                           
+      641 -  render();                                                   
+      642 -}                                                             
+      643 -                                                              
+      644 -// ── Rendering ──────────────────────────────────────────────
+          -────────────────────                                          
+      645 -function render() {                                           
+      646 -  renderHands();                                              
+      647 -  renderTrick();                                              
+      648 -  renderAuction();                                            
+      649 -  renderStatus();                                             
+      650 -  updateScores();                                             
+      651 -}                                                             
+      652 -                                                              
+      653 -const HAND_IDS = ['north','east','south','west'];             
+      654 -                                                              
+      655 -function renderHands() {                                      
+      656 -  for (let p=0;p<4;p++) {                                     
+      657 -    const el = document.getElementById(HAND_IDS[p]+'-hand');  
+      658 -    el.innerHTML = '';                                        
+      659 -    if (!G.hands[p]) continue;                                
+      660 -    for (const c of G.hands[p]) {                             
+      661 -      const d = document.createElement('div');                
+      662 -      d.className = 'card';                                   
+      663 -      d.style.color = SCOL[c.suit];                           
+      664 -      d.textContent = cstr(c);                                
+      665 -                                                              
+      666 -      // Clickable: human's own cards during play             
+      667 -      const isHumanCard = G.phase==='playing' && G.curPlayer==
+          -=p && p===2;                                                  
+      668 -      // Also dummy cards when South is declarer              
+      669 -      const isDummyPlay = G.phase==='playing' && G.curPlayer==
+          -=p && p===G.dummy && G.contract?.declarer===2;                
+      670 -                                                              
+      671 -      if (isHumanCard || isDummyPlay) {                       
+      672 -        d.classList.add('playable');                          
+      673 -        if (isDummyPlay) d.classList.add('dummy-card');       
+      674 -        const cc = c;                                         
+      675 -        d.addEventListener('click', () => onCardClick(p, cc));
+      676 -      }                                                       
+      677 -      // Mark dummy hand                                      
+      678 -      if (G.phase==='playing' && p===G.dummy) d.style.outline=
+          -'1px solid rgba(200,255,200,0.3)';                            
+      679 -      el.appendChild(d);                                      
+      680 -    }                                                         
+      681 -    // HCP badge                                              
+      682 -    const hcpEl = document.getElementById(['n','e','s','w'][p]
+          -+'-hcp');                                                     
+      683 -    if (hcpEl && G.hands[p]) hcpEl.textContent = hHCP(G.hands[
+          -p])+'♦';                                                      
+      684 -  }                                                           
+      685 -}                                                             
+      686 -                                                              
+      687 -function renderTrick() {                                      
+      688 -  const slots = ['n','e','s','w'];                            
+      689 -  for (const sl of slots) document.getElementById('trick-'+sl)
+          -.innerHTML='';                                                
+      690 -                                                              
+      691 -  for (const {player, card: c} of G.curTrick) {               
+      692 -    const sl = document.getElementById('trick-'+slots[player])
+          -;                                                             
+      693 -    const d  = document.createElement('div');                 
+      694 -    d.className = 'card';                                     
+      695 -    d.style.color = SCOL[c.suit];                             
+      696 -    d.textContent = cstr(c);                                  
+      697 -    sl.appendChild(d);                                        
+      698 -  }                                                           
+      699 -                                                              
+      700 -  const tc = document.getElementById('trick-count');          
+      701 -  if (G.phase==='playing'||G.phase==='done') {                
+      702 -    tc.textContent = `NS ${G.tricksNS} – ${G.tricksEW} EW`;   
+      703 -  } else {                                                    
+      704 -    tc.textContent = '';                                      
+      705 -  }                                                           
+      706 -}                                                             
+      707 -                                                              
+      708 -function renderAuction() {                                    
+      709 -  const el = document.getElementById('auction-table');        
+      710 -  if (G.phase !== 'bidding' && G.auction.length===0) { el.inne
+          -rHTML=''; return; }                                           
+      711 -                                                              
+      712 -  // Only show auction table during bidding                   
+      713 -  if (G.phase !== 'bidding') { el.innerHTML=''; return; }     
+      714 -                                                              
+      715 -  let html = '<table><tr><th>N</th><th>E</th><th>S</th><th>W</
+          -th></tr><tr>';                                                
+      716 -  let col = G.dealer;                                         
+      717 -  for(let i=0;i<col;i++) html+='<td></td>';                   
+      718 -                                                              
+      719 -  for(const {player, bid} of G.auction) {                     
+      720 -    html += `<td>${fmtBid(bid)}</td>`;                        
+      721 -    if (player===3) html+='</tr><tr>';                        
+      722 -  }                                                           
+      723 -  html += '</tr></table>';                                    
+      724 -  el.innerHTML = html;                                        
+      725 -  // Show bid box for human                                   
+      726 -  renderBidBox();                                             
+      727 -}                                                             
+      728 -                                                              
+      729 -function fmtBid(b) {                                          
+      730 -  if (b.pass) return '<span style="color:#aaa">Pass</span>';  
+      731 -  const s = b.suit===4?'NT':`<span style="color:${SCOL[b.suit]
+          -}">${SYM[b.suit]}</span>`;                                    
+      732 -  return `<b>${b.level}${s}</b>`;                             
+      733 -}                                                             
+      734 -                                                              
+      735 -function renderBidBox() {                                     
+      736 -  const el = document.getElementById('bid-box');              
+      737 -  if (G.phase!=='bidding'||G.curPlayer!==2) { el.style.display
+          -='none'; return; }                                            
+      738 -  const high = highestBid(G.auction);                         
+      739 -  let html = '<div class="bid-grid">';                        
+      740 -  const scls = ['club','diamond','heart','spade','nt'];       
+      741 -  for(let lv=1;lv<=7;lv++) {                                  
+      742 -    for(let su=0;su<=4;su++) {                                
+      743 -      const b   = mkBid(lv,su);                               
+      744 -      const dis = !beats(b,high);                             
+      745 -      const sym = su===4?'NT':`<span style="color:${SCOL[su]}"
+          ->${SYM[su]}</span>`;                                          
+      746 -      html += `<button class="bid-btn ${scls[su]}${dis?' disab
+          -led':''}"                                                     
+      747 -        onclick="humanBid(${lv},${su})" ${dis?'disabled':''}>$
+          -{lv}${sym}</button>`;                                         
+      748 -    }                                                         
+      749 -  }                                                           
+      750 -  html += '</div><div class="bid-actions"><button class="pass-
+          -btn" onclick="humanBid(-1,-1)">Pass</button></div>';          
+      751 -  el.innerHTML = html;                                        
+      752 -  el.style.display = 'block';                                 
+      753 -}                                                             
+      754 -                                                              
+      755 -function renderStatus() {                                     
+      756 -  const el = document.getElementById('status-msg');           
+      757 -  const cd = document.getElementById('contract-display');     
+      758 -  if (G.msg) { el.textContent=G.msg; }                        
+      759 -  else if (G.phase==='bidding') {                             
+      760 -    if (G.curPlayer===2) el.textContent='Your bid (South):';  
+      761 -    else el.textContent=`${PNAME[G.curPlayer]} is bidding…`;  
+      762 -  } else if (G.phase==='playing') {                           
+      763 -    const p = G.curPlayer;                                    
+      764 -    const human = p===2||(p===G.dummy&&G.contract.declarer===2
+          -);                                                            
+      765 -    el.textContent = human ? 'Your turn — click a card' : `${P
+          -NAME[p]} is playing…`;                                        
+      766 -  } else {                                                    
+      767 -    el.textContent='';                                        
+      768 -  }                                                           
+      769 -                                                              
+      770 -  if (G.contract && G.phase!=='bidding') {                    
+      771 -    const {level,suit,declarer} = G.contract;                 
+      772 -    const sStr = suit===4?'NT':`<span style="color:${SCOL[suit
+          -]}">${SYM[suit]}</span>`;                                     
+      773 -    const need = level+6;                                     
+      774 -    const made = declarer%2===0?G.tricksNS:G.tricksEW;        
+      775 -    cd.innerHTML = `Contract: <b>${level}${sStr}</b> by ${PNAM
+          -E[declarer]} &nbsp;|&nbsp; Need ${need} tricks`;              
+      776 -  } else {                                                    
+      777 -    cd.innerHTML='';                                          
+      778 -  }                                                           
+      779 -}                                                             
+      780 -                                                              
+      781 -function updateScores() {                                     
+      782 -  document.getElementById('ns-score').textContent = G.scoresNS
+          -;                                                             
+      783 -  document.getElementById('ew-score').textContent = G.scoresEW
+          -;                                                             
+      784 -}                                                             
+      785 -                                                              
+      786 -// ── Event handlers ─────────────────────────────────────────
+          -────────────────────                                          
+      787 -function humanBid(level, suit) {                              
+      788 -  if (G.phase!=='bidding'||G.curPlayer!==2) return;           
+      789 -  document.getElementById('bid-box').style.display='none';    
+      790 -  applyBid(2, level===-1 ? PASS() : mkBid(level,suit));       
+      791 -}                                                             
+      792 -                                                              
+      793 -function onCardClick(player, card) {                          
+      794 -  if (G.phase!=='playing') return;                            
+      795 -  // Validate follow-suit                                     
+      796 -  const trick = G.curTrick;                                   
+      797 -  if (trick.length>0) {                                       
+      798 -    const led  = trick[0].card.suit;                          
+      799 -    const have = G.hands[player].some(c=>c.suit===led);       
+      800 -    if (have && card.suit!==led) {                            
+      801 -      G.msg='Must follow suit!';                              
+      802 -      render();                                               
+      803 -      setTimeout(()=>{G.msg='';render();},1200);              
+      804 -      return;                                                 
+      805 -    }                                                         
+      806 -  }                                                           
+      807 -  applyPlay(player, card);                                    
+      808 -}                                                             
+      809 -                                                              
+      810 -function showMessage(title, body) {                           
+      811 -  document.getElementById('msg-title').textContent = title;   
+      812 -  document.getElementById('msg-body').textContent  = body;    
+      813 -  document.getElementById('message-overlay').style.display='bl
+          -ock';                                                         
+      814 -}                                                             
+      815 -                                                              
+      816 -function dismissMessage() {                                   
+      817 -  document.getElementById('message-overlay').style.display='no
+          -ne';                                                          
+      818 -}                                                             
+      819 -                                                              
+      820 -// ── Init ───────────────────────────────────────────────────
+          -────────────────────                                          
+      821 -document.getElementById('new-game-btn').addEventListener('clic
+          -k', newGame);                                                 
+      822 -newGame();                                                    
+      823 -</script>                                                     
+      188 +<script src="bridge.js"></script>                             
+      189 +<script src="ui.js"></script>                                 
+      190  </body>
+      191  </html>
+
+● Let me verify the files look correct and that the logic is consistent:
+
+  Listed 1 directory (ctrl+o to expand)
+
+● Bash(node -e "
+      const fs = require('fs');…)
+  ⎿  Missing from bridge.js: none
+     bridge.js syntax: OK
+     ui.js syntax: OK
+
+● All symbols resolve and both files parse cleanly. The split is:
+
+  - bridge.js (297 lines) — pure business logic, zero DOM: constants, card/bid
+  utilities, deck shuffling, AI bidding, AI card play, trick winner, scoring
+  - ui.js (298 lines) — game state (G), bidding/play flow, all DOM rendering,
+  event handlers
+  - index.html (191 lines) — HTML structure + CSS only, loads bridge.js then
+  ui.js
+
+  bridge.js has no dependency on ui.js; ui.js depends on the globals exported by
+   bridge.js (loaded first via script order).
+
+✻ Crunched for 3m 20s
+
+❯ set the .card class minwidth so all cards have the same width
+
+● Update(index.html)
+  ⎿  Added 1 line, removed 1 line
+      54  .card {
+      55    background: #fff; color: #000; border-radius: 5px;
+      56    padding: 4px 6px; font-size: 0.85rem; font-weight: bold;
+      57 -  cursor: default; user-select: none; min-width: 38px; text-ali
+         -gn: center;                                                    
+      57 +  cursor: default; user-select: none; width: 44px; text-align: 
+         +center;                                                        
+      58    box-shadow: 1px 1px 3px rgba(0,0,0,0.3);
+      59    border: 2px solid transparent;
+      60    transition: transform 0.1s, border-color 0.1s;
+
+● Also remove the redundant min-width on .card.back:
+
+● Update(index.html)
+  ⎿  Added 1 line, removed 1 line
+      61  }
+      62  .card.playable { cursor: pointer; border-color: #ffe066; }
+      63  .card.playable:hover { transform: translateY(-6px); border-colo
+          r: #ffd700; }
+      64 -.card.back { background: #1a3a8a; color: #1a3a8a; min-width: 38
+         -px; }                                                          
+      64 +.card.back { background: #1a3a8a; color: #1a3a8a; }            
+      65  .card.dummy-card { border-color: #aaffaa; }
+      66  
+      67  #center {
+
+● Changed min-width: 38px to width: 44px — wide enough for "10♠" (the widest
+  card) while keeping all cards uniform. The old min-width let shorter labels
+  like "2♣" be narrower than "10♠", causing uneven widths.
+
+✻ Churned for 13s
+
+❯ why is the hcp showing a ♦
+
+● It's hardcoded in ui.js:163:
+
+  hcpEl.textContent = hHCP(G.hands[p])+'♦';
+
+  No good reason — it was probably added as a decorative touch but ♦ reads like
+  it means diamond-suit points. I'll remove it:
+
+● Update(ui.js)
+  ⎿  Added 1 line, removed 1 line
+      162        el.appendChild(d);
+      163      }
+      164      const hcpEl = document.getElementById(['n','e','s','w'][p]
+           +'-hcp');
+      165 -    if (hcpEl && G.hands[p]) hcpEl.textContent = hHCP(G.hands[
+          -p])+'♦';                                                      
+      165 +    if (hcpEl && G.hands[p]) hcpEl.textContent = hHCP(G.hands[
+          +p])+'p';                                                      
+      166    }
+      167  }
+      168  
+
+● Now it shows e.g. 13p (points) instead of 13♦.
+
+✻ Churned for 13s
+❯ the webpage is showin a scrollbar when it shouldn't need to. make it fit on
+  the page without a scrollbar
+
+● The problem is height: calc(100vh - 40px) on #table — it assumes the header is
+   exactly 40px, but it's not, so the total exceeds the viewport. The fix is to
+  make body a flex column so #table takes whatever space remains after the
+  header.
+
+● Update(index.html)
+  ⎿  Added 1 line, removed 1 line
+       6  <title>Bridge</title>
+       7  <style>
+       8  * { box-sizing: border-box; margin: 0; padding: 0; }
+       9 -body { background: #1a6b3a; font-family: 'Segoe UI', sans-serif
+         -; color: #fff; min-height: 100vh; }                            
+       9 +body { background: #1a6b3a; font-family: 'Segoe UI', sans-serif
+         +; color: #fff; height: 100vh; overflow: hidden; display: flex; 
+         +flex-direction: column; }                                      
+      10  
+      11  #header {
+      12    display: flex; align-items: center; justify-content: space-be
+          tween;
+
+● Update(index.html)
+  ⎿  Added 2 lines, removed 1 line
+      20    display: grid;
+      21    grid-template-rows: auto 1fr auto;
+      22    grid-template-columns: 1fr;
+      23 -  height: calc(100vh - 40px);                                  
+      23 +  flex: 1;                                                     
+      24 +  min-height: 0;                                               
+      25    gap: 4px;
+      26    padding: 8px;
+      27  }
+
+● body is now a flex column capped at 100vh with overflow: hidden, and #table
+  uses flex: 1; min-height: 0 to fill exactly the remaining space — no
+  arithmetic needed.
+
+✻ Churned for 26s
+
+❯ dont center the center area vertically - keep it towards the top. don't
+  anchor the south-area on the bottom of the page, put it under the center area
+
+● This needs two changes: restructure the HTML to move #south-area inside the
+  center column (below #center), and update the CSS to match.
+
+  Read 1 file (ctrl+o to expand)
+
+● Update(index.html)
+  ⎿  Added 17 lines, removed 15 lines
+      156        <div class="player-label">West <span class="hcp-badge" i
+           d="w-hcp"></span></div>
+      157        <div id="west-hand" class="hand vertical"></div>
+      158      </div>
+      159 -    <div id="center">                                         
+      160 -      <div id="contract-display"></div>                       
+      161 -      <div id="trick-area">                                   
+      162 -        <div class="trick-slot n" id="trick-n"></div>         
+      163 -        <div class="trick-slot e" id="trick-e"></div>         
+      164 -        <div class="trick-slot s" id="trick-s"></div>         
+      165 -        <div class="trick-slot w" id="trick-w"></div>         
+      166 -        <div class="trick-count" id="trick-count"></div>      
+      159 +    <div id="center-column">                                  
+      160 +      <div id="center">                                       
+      161 +        <div id="contract-display"></div>                     
+      162 +        <div id="trick-area">                                 
+      163 +          <div class="trick-slot n" id="trick-n"></div>       
+      164 +          <div class="trick-slot e" id="trick-e"></div>       
+      165 +          <div class="trick-slot s" id="trick-s"></div>       
+      166 +          <div class="trick-slot w" id="trick-w"></div>       
+      167 +          <div class="trick-count" id="trick-count"></div>    
+      168 +        </div>                                                
+      169 +        <div id="auction-table"></div>                        
+      170 +        <div id="bid-box"></div>                              
+      171 +        <div id="status-msg"></div>                           
+      172        </div>
+      168 -      <div id="auction-table"></div>                          
+      169 -      <div id="bid-box"></div>                                
+      170 -      <div id="status-msg"></div>                             
+      173 +      <div id="south-area">                                   
+      174 +        <div id="south-hand" class="hand"></div>              
+      175 +        <div class="player-label">South — You <span class="hcp
+          +-badge" id="s-hcp"></span></div>                              
+      176 +      </div>                                                  
+      177      </div>
+      178      <div id="east-area">
+      179        <div class="player-label">East <span class="hcp-badge" i
+           d="e-hcp"></span></div>
+      180        <div id="east-hand" class="hand vertical"></div>
+      181      </div>
+      182    </div>
+      177 -  <div id="south-area">                                       
+      178 -    <div id="south-hand" class="hand"></div>                  
+      179 -    <div class="player-label">South — You <span class="hcp-bad
+          -ge" id="s-hcp"></span></div>                                  
+      180 -  </div>                                                      
+      183  </div>
+      184  
+      185  <div id="message-overlay">
+
+● Now update the CSS — fix the grid rows, add #center-column, and remove
+  justify-content: center from #center:
+
+● Update(index.html)
+  ⎿  Added 1 line, removed 1 line
+      18  
+      19  #table {
+      20    display: grid;
+      21 -  grid-template-rows: auto 1fr auto;                           
+      21 +  grid-template-rows: auto 1fr;                                
+      22    grid-template-columns: 1fr;
+      23    flex: 1;
+      24    min-height: 0;
+
+● Update(index.html)
+  ⎿  Added 4 lines
+      34    grid-template-columns: 140px 1fr 140px;
+      35    gap: 8px;
+      36    overflow: hidden;
+      37 +  align-items: start;                                          
+      38  }
+      39 +#center-column {                                               
+      40 +  display: flex; flex-direction: column; align-items: center; g
+         +ap: 8px;                                                       
+      41 +}                                                              
+      42  #west-area, #east-area {
+      43    display: flex; flex-direction: column; align-items: center; g
+          ap: 4px;
+      44    padding-top: 20px;
+
+● Update(index.html)
+  ⎿  Added 1 line, removed 1 line
+      71  
+      72  #center {
+      73    display: flex; flex-direction: column; align-items: center;
+      74 -  gap: 8px; justify-content: center;                           
+      74 +  gap: 8px;                                                    
+      75  }
+      76  
+      77  #status-msg {
+
+● The changes:
+  - #south-area is now inside a #center-column wrapper, directly below #center
+  - #middle-row uses align-items: start so West/East align to the top rather
+  than stretching full height
+  - #center no longer has justify-content: center, so content sits at the top
+  - #table grid drops the third row since south is no longer a direct child
+
+✻ Baked for 1m 7s
+
+❯ make the west and east hands align vertically with the center content
+
+  Read 1 file (ctrl+o to expand)
+
+● The #middle-row row fills 1fr of the viewport. Making west/east use
+  align-self: center will center them vertically alongside the center content,
+  while #center-column stays at the top with align-self: start. The padding-top:
+   20px was a manual hack that can go away.
+
+● Update(index.html)
+  ⎿  Added 2 lines, removed 2 lines
+      34    grid-template-columns: 140px 1fr 140px;
+      35    gap: 8px;
+      36    overflow: hidden;
+      37 -  align-items: start;                                          
+      37  }
+      38  #center-column {
+      39    display: flex; flex-direction: column; align-items: center; g
+          ap: 8px;
+      40 +  align-self: start;                                           
+      41  }
+      42  #west-area, #east-area {
+      43    display: flex; flex-direction: column; align-items: center; g
+          ap: 4px;
+      44 -  padding-top: 20px;                                           
+      44 +  align-self: center;                                          
+      45  }
+      46  .player-label {
+      47    font-size: 0.75rem; color: rgba(255,255,255,0.7); letter-spac
+          ing: 1px; text-transform: uppercase;
+
+● Removed align-items: start from #middle-row (the grid default is stretch, so
+  each cell fills the row height). #center-column gets align-self: start to stay
+   at the top, and #west-area/#east-area get align-self: center to vertically
+  center their cards alongside the center content. The padding-top: 20px hack is
+   gone.
+
+✻ Baked for 45s
+
+❯ undo the last change
+
+● Update(index.html)
+  ⎿  Added 2 lines, removed 2 lines
+      34    grid-template-columns: 140px 1fr 140px;
+      35    gap: 8px;
+      36    overflow: hidden;
+      37 +  align-items: start;                                          
+      38  }
+      39  #center-column {
+      40    display: flex; flex-direction: column; align-items: center; g
+          ap: 8px;
+      40 -  align-self: start;                                           
+      41  }
+      42  #west-area, #east-area {
+      43    display: flex; flex-direction: column; align-items: center; g
+          ap: 4px;
+      44 -  align-self: center;                                          
+      44 +  padding-top: 20px;                                           
+      45  }
+      46  .player-label {
+      47    font-size: 0.75rem; color: rgba(255,255,255,0.7); letter-spac
+          ing: 1px; text-transform: uppercase;
+
+● Done, reverted.
+
+✻ Cogitated for 7s
+
+❯ when west plays there is a javascript error in bridge.js line 208
+  Read 1 file (ctrl+o to expand)
+
+● Line 202: state.currentTrick — but the game state object in ui.js uses
+  curTrick, not currentTrick. So trick is undefined and .length throws.
+
+● Update(bridge.js)
+  ⎿  Added 1 line, removed 1 line
+      199  // ── Card play AI ───────────────────────────────────────────
+           ────────────────────
+      200  function aiPlay(state, player) {
+      201    const h      = state.hands[player];
+      202 -  const trick  = state.currentTrick;                          
+      202 +  const trick  = state.curTrick;                              
+      203    const trump  = state.contract.suit < 4 ? state.contract.suit
+            : -1;
+      204    const isDecl = player === state.contract.declarer;
+      205    const pard   = (player+2)%4;
+
+● state.currentTrick was a typo — the state field is curTrick.
+
+✻ Crunched for 10s
+
+❯ are there any other bugs like that
+
+● Let me check all state property accesses in bridge.js against what ui.js
+  actually puts on the G object.
+
+  Searched for 2 patterns (ctrl+o to expand)
+
+● All six state.* accesses in bridge.js — hands, auction, curTrick,
+  contract.suit, contract.declarer — match the actual G properties. No other
+  mismatches.
+
+✻ Cogitated for 31s
+
+❯ use a larger font
+
+● Most sizes use rem, so setting a larger base on html scales everything at
+  once.
+
+  Read 1 file (ctrl+o to expand)
+
+● Update(index.html)
+  ⎿  Added 1 line
+       6  <title>Bridge</title>
+       7  <style>
+       8  * { box-sizing: border-box; margin: 0; padding: 0; }
+       9 +html { font-size: 20px; }                                      
+      10  body { background: #1a6b3a; font-family: 'Segoe UI', sans-serif
+          ; color: #fff; height: 100vh; overflow: hidden; display: flex; 
+          flex-direction: column; }
+      11  
+      12  #header {
+
+● The browser default is 16px; setting html to 20px scales all rem-based sizes
+  up by 25%. Let me know if you want it larger or smaller.
+
+✻ Brewed for 41s
+
+❯ pause after last card is played
+
+● Currently the trick is cleared immediately when the 4th card is played. I'll
+  add a pause so all 4 cards are visible before moving on.
+
+● Update(ui.js)
+  ⎿  Added 11 lines, removed 9 lines
+       83    G.curTrick.push({player, card});
+       84  
+       85    if (G.curTrick.length === 4) {
+       86 -    const trump = G.contract.suit<4 ? G.contract.suit : -1;   
+       87 -    const win   = trickWinner(G.curTrick, trump);             
+       88 -    G.tricks.push({winner:win, cards:G.curTrick});            
+       89 -    if (win%2===0) G.tricksNS++; else G.tricksEW++;           
+       90 -    G.curTrick  = [];                                         
+       91 -    G.curPlayer = win;                                        
+       92 -                                                              
+       93 -    if (G.tricks.length === 13) { endGame(); return; }        
+       86      render();
+       95 -    setTimeout(advancePlay, 1000);                            
+       87 +    setTimeout(() => {                                        
+       88 +      const trump = G.contract.suit<4 ? G.contract.suit : -1; 
+       89 +      const win   = trickWinner(G.curTrick, trump);           
+       90 +      G.tricks.push({winner:win, cards:G.curTrick});          
+       91 +      if (win%2===0) G.tricksNS++; else G.tricksEW++;         
+       92 +      G.curTrick  = [];                                       
+       93 +      G.curPlayer = win;                                      
+       94 +      if (G.tricks.length === 13) { endGame(); return; }      
+       95 +      render();                                               
+       96 +      setTimeout(advancePlay, 400);                           
+       97 +    }, 1200);                                                 
+       98    } else {
+       99      G.curPlayer = (G.curPlayer+1)%4;
+      100      render();
+
+● All 4 cards now stay visible for 1.2 seconds before the trick is cleared and
+  the next one begins.
+
+✻ Churned for 17s
+
+❯ anchor south-area below east/west area
+
+● This means moving #south-area back out of #center-column and restoring it as a
+   third row in #table.
+
+● Update(index.html)
+  ⎿  Removed 4 lines
+      175          <div id="bid-box"></div>
+      176          <div id="status-msg"></div>
+      177        </div>
+      178 -      <div id="south-area">                                   
+      179 -        <div id="south-hand" class="hand"></div>              
+      180 -        <div class="player-label">South — You <span class="hcp
+          --badge" id="s-hcp"></span></div>                              
+      181 -      </div>                                                  
+      178      </div>
+      179      <div id="east-area">
+      180        <div class="player-label">East <span class="hcp-badge" i
+           d="e-hcp"></span></div>
+
+● Update(index.html)
+  ⎿  Added 4 lines
+      181        <div id="east-hand" class="hand vertical"></div>
+      182      </div>
+      183    </div>
+      184 +  <div id="south-area">                                       
+      185 +    <div id="south-hand" class="hand"></div>                  
+      186 +    <div class="player-label">South — You <span class="hcp-bad
+          +ge" id="s-hcp"></span></div>                                  
+      187 +  </div>                                                      
+      188  </div>
+      189  
+      190  <div id="message-overlay">
+
+● Now restore the third grid row in #table:
+
+● Update(index.html)
+  ⎿  Added 1 line, removed 1 line
+      19  
+      20  #table {
+      21    display: grid;
+      22 -  grid-template-rows: auto 1fr;                                
+      22 +  grid-template-rows: auto 1fr auto;                           
+      23    grid-template-columns: 1fr;
+      24    flex: 1;
+      25    min-height: 0;
+
+● #south-area is now a direct child of #table again, sitting in the third row
+  below the middle row (which contains west, center, and east). The middle row
+  still takes 1fr so south is pinned at the bottom of the viewport, level with
+  where west and east end.
+
+✻ Churned for 39s
+❯ undo the last change
+
+● Update(index.html)
+  ⎿  Added 4 lines
+      175          <div id="bid-box"></div>
+      176          <div id="status-msg"></div>
+      177        </div>
+      178 +      <div id="south-area">                                   
+      179 +        <div id="south-hand" class="hand"></div>              
+      180 +        <div class="player-label">South — You <span class="hcp
+          +-badge" id="s-hcp"></span></div>                              
+      181 +      </div>                                                  
+      182      </div>
+      183      <div id="east-area">
+      184        <div class="player-label">East <span class="hcp-badge" i
+           d="e-hcp"></span></div>
+
+● Update(index.html)
+  ⎿  Removed 4 lines
+      185        <div id="east-hand" class="hand vertical"></div>
+      186      </div>
+      187    </div>
+      188 -  <div id="south-area">                                       
+      189 -    <div id="south-hand" class="hand"></div>                  
+      190 -    <div class="player-label">South — You <span class="hcp-bad
+          -ge" id="s-hcp"></span></div>                                  
+      191 -  </div>                                                      
+      188  </div>
+      189  
+      190  <div id="message-overlay">
+
+● Update(index.html)
+  ⎿  Added 1 line, removed 1 line
+      19  
+      20  #table {
+      21    display: grid;
+      22 -  grid-template-rows: auto 1fr auto;                           
+      22 +  grid-template-rows: auto 1fr;                                
+      23    grid-template-columns: 1fr;
+      24    flex: 1;
+      25    min-height: 0;
+
+● Done, reverted.
+
+✻ Baked for 14s
+
+❯ deal a new hand after the score is shown
+
+● Update(ui.js)
+  ⎿  Added 1 line
+      293  
+      294  function dismissMessage() {
+      295    document.getElementById('message-overlay').style.display='no
+           ne';
+      296 +  if (G && G.phase === 'done') newGame();                     
+      297  }
+      298  
+      299  // ── Init ───────────────────────────────────────────────────
+           ────────────────────
+
+● Clicking "Continue" on the result overlay now starts a new deal automatically.
+
+✻ Sautéed for 13s
+
+❯ add option to replay hand when hand completes
+
+● I'll save the dealt hands at game start so replay can restore them, add a
+  replayHand() function, and update the overlay to show two buttons.
+
+● Update(ui.js)
+  ⎿  Added 3 lines, removed 1 line
+       4  let G = null;
+       5  
+       6  function newGame() {
+       7 +  const hands = deal();                                        
+       8    G = {
+       9      phase: 'bidding',
+       9 -    hands: deal(),                                             
+      10 +    hands,                                                     
+      11 +    originalHands: hands.map(h => [...h]),                     
+      12      dealer: 0,
+      13      auction: [],
+      14      contract: null,
+
+● Update(ui.js)
+  ⎿  Added 27 lines, removed 1 line
+      293    document.getElementById('message-overlay').style.display='bl
+           ock';
+      294  }
+      295  
+      296 +function replayHand() {                                       
+      297 +  document.getElementById('message-overlay').style.display='no
+          +ne';                                                          
+      298 +  G = {                                                       
+      299 +    phase: 'bidding',                                         
+      300 +    hands: G.originalHands.map(h => [...h]),                  
+      301 +    originalHands: G.originalHands,                           
+      302 +    dealer: G.dealer,                                         
+      303 +    auction: [],                                              
+      304 +    contract: null,                                           
+      305 +    dummy: -1,                                                
+      306 +    leader: -1,                                               
+      307 +    curPlayer: G.dealer,                                      
+      308 +    curTrick: [],                                             
+      309 +    tricks: [],                                               
+      310 +    tricksNS: 0,                                              
+      311 +    tricksEW: 0,                                              
+      312 +    vulnerable: G.vulnerable,                                 
+      313 +    scoresNS: G.scoresNS,                                     
+      314 +    scoresEW: G.scoresEW,                                     
+      315 +    passCount: 0,                                             
+      316 +    msg: '',                                                  
+      317 +  };                                                          
+      318 +  render();                                                   
+      319 +  setTimeout(advanceBid, 400);                                
+      320 +}                                                             
+      321 +                                                              
+      322  function dismissMessage() {
+      323    document.getElementById('message-overlay').style.display='no
+           ne';
+      298 -  if (G && G.phase === 'done') newGame();                     
+      324 +  newGame();                                                  
+      325  }
+      326  
+      327  // ── Init ───────────────────────────────────────────────────
+           ────────────────────
+
+● Now update the overlay in index.html to show both buttons:
+
+● Update(index.html)
+  ⎿  Added 4 lines, removed 1 line
+      190  <div id="message-overlay">
+      191    <h2 id="msg-title"></h2>
+      192    <p id="msg-body"></p>
+      193 -  <button onclick="dismissMessage()">Continue</button>        
+      193 +  <div style="display:flex;gap:10px;justify-content:center;"> 
+      194 +    <button onclick="replayHand()">Replay Hand</button>       
+      195 +    <button onclick="dismissMessage()">New Deal</button>      
+      196 +  </div>                                                      
+      197  </div>
+      198  
+      199  <script src="bridge.js"></script>
+
+● "Replay Hand" resets the auction and play but restores the same 52 cards to
+  the same players. "New Deal" shuffles fresh. Both dismiss the overlay first.
+
+✻ Crunched for 42s
+
+❯ when replay a hand don't count the points from the previous hand
+
+● I need to snapshot the scores at the start of each deal and restore them on
+  replay. Let me add baseScoresNS/baseScoresEW to the game state.
+
+● Update(ui.js)
+  ⎿  Added 2 lines
+      20      tricksNS: 0,
+      21      tricksEW: 0,
+      22      vulnerable: [false, false],
+      23 +    baseScoresNS: G ? G.scoresNS : 0,                          
+      24 +    baseScoresEW: G ? G.scoresEW : 0,                          
+      25      scoresNS: G ? G.scoresNS : 0,
+      26      scoresEW: G ? G.scoresEW : 0,
+      27      passCount: 0,
+
+● Update(ui.js)
+  ⎿  Added 4 lines, removed 2 lines
+      312      tricksNS: 0,
+      313      tricksEW: 0,
+      314      vulnerable: G.vulnerable,
+      315 -    scoresNS: G.scoresNS,                                     
+      316 -    scoresEW: G.scoresEW,                                     
+      315 +    baseScoresNS: G.baseScoresNS,                             
+      316 +    baseScoresEW: G.baseScoresEW,                             
+      317 +    scoresNS: G.baseScoresNS,                                 
+      318 +    scoresEW: G.baseScoresEW,                                 
+      319      passCount: 0,
+      320      msg: '',
+      321    };
+
+● Replay now resets the running scores back to what they were before the hand
+  was first played, so points from the previous attempt are undone.
+
+✻ Brewed for 26s
+
+❯ hide east west and north hands as appropriate. Add an option to show all
+  hands.
+
+● I'll hide opponent hands (East/West) and North during bidding, reveal North as
+   dummy during play, and add a "Show all" checkbox.
+● Update(index.html)
+  ⎿  Added 6 lines, removed 1 line
+      148      <span>NS: <b id="ns-score">0</b></span>
+      149      <span>EW: <b id="ew-score">0</b></span>
+      150    </div>
+      151 -  <div id="controls"><button id="new-game-btn">New Deal</butto
+          -n></div>                                                      
+      151 +  <div id="controls">                                         
+      152 +    <label style="font-size:0.75rem;cursor:pointer;margin-righ
+          +t:12px;user-select:none;">                                    
+      153 +      <input type="checkbox" id="show-all-cb"> Show all hands 
+      154 +    </label>                                                  
+      155 +    <button id="new-game-btn">New Deal</button>               
+      156 +  </div>                                                      
+      157  </div>
+      158  
+      159  <div id="table">
+
+● Now update ui.js to add the visibility logic:
+
+● Update(ui.js)
+  ⎿  Added 8 lines
+       2  
+       3  // ── Game state ──────────────────────────────────────────────
+          ───────────────────
+       4  let G = null;
+       5 +let showAll = false;                                           
+       6  
+       7 +function isHandVisible(p) {                                    
+       8 +  if (showAll) return true;                                    
+       9 +  if (p === 2) return true; // South always visible            
+      10 +  if (G.phase === 'playing' && p === G.dummy) return true; // d
+         +ummy face-up                                                   
+      11 +  return false;                                                
+      12 +}                                                              
+      13 +                                                               
+      14  function newGame() {
+      15    const hands = deal();
+      16    G = {
+
+● Now update renderHands to use the back class for hidden cards:
+
+● Update(ui.js)
+  ⎿  Added 6 lines
+      157      const el = document.getElementById(HAND_IDS[p]+'-hand');
+      158      el.innerHTML = '';
+      159      if (!G.hands[p]) continue;
+      160 +    const visible = isHandVisible(p);                         
+      161      for (const c of G.hands[p]) {
+      162        const d = document.createElement('div');
+      163 +      if (!visible) {                                         
+      164 +        d.className = 'card back';                            
+      165 +        el.appendChild(d);                                    
+      166 +        continue;                                             
+      167 +      }                                                       
+      168        d.className = 'card';
+      169        d.style.color = SCOL[c.suit];
+      170        d.textContent = cstr(c);
+
+● Finally, wire up the checkbox:
+
+● Update(ui.js)
+  ⎿  Added 1 line
+      344  
+      345  // ── Init ───────────────────────────────────────────────────
+           ────────────────────
+      346  document.getElementById('new-game-btn').addEventListener('clic
+           k', newGame);
+      347 +document.getElementById('show-all-cb').addEventListener('chang
+          +e', e => { showAll = e.target.checked; render(); });          
+      348  newGame();
+
+● Done. Visibility rules:
+  - South: always face-up
+  - North: face-down during bidding, face-up as dummy once play begins
+  - East/West: always face-down
+  - Show all hands checkbox in the header overrides everything
+
+✻ Cooked for 58s
+
+❯ only show hcp as appropriate, but show it if "show all hands" is selected
+
+● Update(ui.js)
+  ⎿  Added 1 line, removed 1 line
+      182        el.appendChild(d);
+      183      }
+      184      const hcpEl = document.getElementById(['n','e','s','w'][p]
+           +'-hcp');
+      185 -    if (hcpEl && G.hands[p]) hcpEl.textContent = hHCP(G.hands[
+          -p])+'p';                                                      
+      185 +    if (hcpEl) hcpEl.textContent = visible && G.hands[p] ? hHC
+          +P(G.hands[p])+'p' : '';                                       
+      186    }
+      187  }
+      188  
+
+● HCP now follows the same visibility rules as the cards — shown for South
+  always, North when dummy, hidden for East/West, and revealed for all when
+  "Show all hands" is checked.
+
+✻ Sautéed for 10s
+
+❯ the user should play north when north wins the bidding
+
+● Currently the human only controls South (and North as dummy when South
+  declares). The fix is: if NS wins the contract, the human plays both North and
+   South; if EW wins, the computer plays everyone.
+
+● Update(ui.js)
+  ⎿  Added 1 line, removed 1 line
+      84  function advancePlay() {
+      85    if (G.phase !== 'playing') return;
+      86    const p = G.curPlayer;
+      87 -  const humanTurn = p===2 || (p===G.dummy && G.contract.declare
+         -r===2);                                                        
+      87 +  const humanTurn = G.contract.declarer % 2 === 0 && (p === 0 |
+         +| p === 2);                                                    
+      88    if (humanTurn) { render(); return; }
+      89    const c = aiPlay(G, p);
+      90    applyPlay(p, c);
+
+● Update(ui.js)
+  ⎿  Added 6 lines, removed 5 lines
+      169        d.style.color = SCOL[c.suit];
+      170        d.textContent = cstr(c);
+      171  
+      172 -      const isHumanCard = G.phase==='playing' && G.curPlayer==
+          -=p && p===2;                                                  
+      173 -      const isDummyPlay = G.phase==='playing' && G.curPlayer==
+          -=p && p===G.dummy && G.contract?.declarer===2;                
+      172 +      const isNSContract = G.contract?.declarer % 2 === 0;    
+      173 +      const isDummy = G.phase==='playing' && p === G.dummy;   
+      174 +      const isHumanCard = G.phase==='playing' && G.curPlayer==
+          +=p && isNSContract && (p===0 || p===2);                       
+      175  
+      175 -      if (isHumanCard || isDummyPlay) {                       
+      176 +      if (isHumanCard) {                                      
+      177          d.classList.add('playable');
+      177 -        if (isDummyPlay) d.classList.add('dummy-card');       
+      178 +        if (isDummy) d.classList.add('dummy-card');           
+      179          const cc = c;
+      180          d.addEventListener('click', () => onCardClick(p, cc));
+      181        }
+      181 -      if (G.phase==='playing' && p===G.dummy) d.style.outline=
+          -'1px solid rgba(200,255,200,0.3)';                            
+      182 +      if (isDummy) d.style.outline='1px solid rgba(200,255,200
+          +,0.3)';                                                       
+      183        el.appendChild(d);
+      184      }
+      185      const hcpEl = document.getElementById(['n','e','s','w'][p]
+           +'-hcp');
+
+● Also update the status message so it says the right thing when North is
+  playing:
+
+● Update(ui.js)
+  ⎿  Added 1 line, removed 1 line
+      259      el.textContent = G.curPlayer===2 ? 'Your bid (South):' : `
+           ${PNAME[G.curPlayer]} is bidding…`;
+      260    } else if (G.phase==='playing') {
+      261      const p = G.curPlayer;
+      262 -    const human = p===2||(p===G.dummy&&G.contract.declarer===2
+          -);                                                            
+      262 +    const human = G.contract.declarer % 2 === 0 && (p === 0 ||
+          + p === 2);                                                    
+      263      el.textContent = human ? 'Your turn — click a card' : `${P
+           NAME[p]} is playing…`;
+      264    } else {
+      265      el.textContent='';
+
+● Now when NS wins the contract (whether North or South is declarer), the human
+  clicks cards for both North and South. When EW wins, the computer plays all
+  four hands automatically.
+
+✻ Crunched for 53s
+
+❯ the human always plays south
+
+● Reverting the last change — back to: human plays South always, and also
+  controls North dummy when South is the declarer.
+
+● Update(ui.js)
+  ⎿  Added 1 line, removed 1 line
+      84  function advancePlay() {
+      85    if (G.phase !== 'playing') return;
+      86    const p = G.curPlayer;
+      87 -  const humanTurn = G.contract.declarer % 2 === 0 && (p === 0 |
+         -| p === 2);                                                    
+      87 +  const humanTurn = p===2 || (p===G.dummy && G.contract.declare
+         +r===2);                                                        
+      88    if (humanTurn) { render(); return; }
+      89    const c = aiPlay(G, p);
+      90    applyPlay(p, c);
+
+● Update(ui.js)
+  ⎿  Added 5 lines, removed 6 lines
+      169        d.style.color = SCOL[c.suit];
+      170        d.textContent = cstr(c);
+      171  
+      172 -      const isNSContract = G.contract?.declarer % 2 === 0;    
+      173 -      const isDummy = G.phase==='playing' && p === G.dummy;   
+      174 -      const isHumanCard = G.phase==='playing' && G.curPlayer==
+          -=p && isNSContract && (p===0 || p===2);                       
+      172 +      const isHumanCard = G.phase==='playing' && G.curPlayer==
+          +=p && p===2;                                                  
+      173 +      const isDummyPlay = G.phase==='playing' && G.curPlayer==
+          +=p && p===G.dummy && G.contract?.declarer===2;                
+      174  
+      176 -      if (isHumanCard) {                                      
+      175 +      if (isHumanCard || isDummyPlay) {                       
+      176          d.classList.add('playable');
+      178 -        if (isDummy) d.classList.add('dummy-card');           
+      177 +        if (isDummyPlay) d.classList.add('dummy-card');       
+      178          const cc = c;
+      179          d.addEventListener('click', () => onCardClick(p, cc));
+      180        }
+      182 -      if (isDummy) d.style.outline='1px solid rgba(200,255,200
+          -,0.3)';                                                       
+      181 +      if (G.phase==='playing' && p===G.dummy) d.style.outline=
+          +'1px solid rgba(200,255,200,0.3)';                            
+      182        el.appendChild(d);
+      183      }
+      184      const hcpEl = document.getElementById(['n','e','s','w'][p]
+           +'-hcp');
+
+● Update(ui.js)
+  ⎿  Added 1 line, removed 1 line
+      258      el.textContent = G.curPlayer===2 ? 'Your bid (South):' : `
+           ${PNAME[G.curPlayer]} is bidding…`;
+      259    } else if (G.phase==='playing') {
+      260      const p = G.curPlayer;
+      261 -    const human = G.contract.declarer % 2 === 0 && (p === 0 ||
+          - p === 2);                                                    
+      261 +    const human = p===2 || (p===G.dummy && G.contract.declarer
+          +===2);                                                        
+      262      el.textContent = human ? 'Your turn — click a card' : `${P
+           NAME[p]} is playing…`;
+      263    } else {
+      264      el.textContent='';
+● Done. Human plays South at all times, and also controls North's cards when
+  South is the declarer (North is dummy).
+
+✻ Baked for 43s
+
+❯ human also controls north and south when south is dummy
+
+● So when NS wins the contract, the human plays both hands regardless of which
+  one is declarer vs dummy.
+
+● Update(ui.js)
+  ⎿  Added 2 lines, removed 1 line
+      84  function advancePlay() {
+      85    if (G.phase !== 'playing') return;
+      86    const p = G.curPlayer;
+      87 -  const humanTurn = p===2 || (p===G.dummy && G.contract.declare
+         -r===2);                                                        
+      87 +  const isNSContract = G.contract.declarer % 2 === 0;          
+      88 +  const humanTurn = p===2 || (isNSContract && p===0);          
+      89    if (humanTurn) { render(); return; }
+      90    const c = aiPlay(G, p);
+      91    applyPlay(p, c);
+
+● Update(ui.js)
+  ⎿  Added 6 lines, removed 5 lines
+      170        d.style.color = SCOL[c.suit];
+      171        d.textContent = cstr(c);
+      172  
+      173 -      const isHumanCard = G.phase==='playing' && G.curPlayer==
+          -=p && p===2;                                                  
+      174 -      const isDummyPlay = G.phase==='playing' && G.curPlayer==
+          -=p && p===G.dummy && G.contract?.declarer===2;                
+      173 +      const isNSContract = G.contract?.declarer % 2 === 0;    
+      174 +      const isDummy = G.phase==='playing' && p===G.dummy;     
+      175 +      const isHumanCard = G.phase==='playing' && G.curPlayer==
+          +=p && (p===2 || (isNSContract && p===0));                     
+      176  
+      176 -      if (isHumanCard || isDummyPlay) {                       
+      177 +      if (isHumanCard) {                                      
+      178          d.classList.add('playable');
+      178 -        if (isDummyPlay) d.classList.add('dummy-card');       
+      179 +        if (isDummy) d.classList.add('dummy-card');           
+      180          const cc = c;
+      181          d.addEventListener('click', () => onCardClick(p, cc));
+      182        }
+      182 -      if (G.phase==='playing' && p===G.dummy) d.style.outline=
+          -'1px solid rgba(200,255,200,0.3)';                            
+      183 +      if (isDummy) d.style.outline='1px solid rgba(200,255,200
+          +,0.3)';                                                       
+      184        el.appendChild(d);
+      185      }
+      186      const hcpEl = document.getElementById(['n','e','s','w'][p]
+           +'-hcp');
+
+● Update(ui.js)
+  ⎿  Added 2 lines, removed 1 line
+      260      el.textContent = G.curPlayer===2 ? 'Your bid (South):' : `
+           ${PNAME[G.curPlayer]} is bidding…`;
+      261    } else if (G.phase==='playing') {
+      262      const p = G.curPlayer;
+      263 -    const human = p===2 || (p===G.dummy && G.contract.declarer
+          -===2);                                                        
+      263 +    const isNSContract = G.contract.declarer % 2 === 0;       
+      264 +    const human = p===2 || (isNSContract && p===0);           
+      265      el.textContent = human ? 'Your turn — click a card' : `${P
+           NAME[p]} is playing…`;
+      266    } else {
+      267      el.textContent='';
+
+● Now when NS wins the contract, the human clicks cards for both North and South
+   — whichever is declarer or dummy. When EW wins, computer plays everything.
+
+✻ Cooked for 30s
+
+❯ while playing a hand it look like west played two cards on one play. Then at
+  on the last card, there was a javascript exception in ui.js line 199
+
+  Read 1 file (ctrl+o to expand)
+
+● Two related bugs. The "West played two cards" comes first: after the 4th card
+  is played, G.curPlayer still points to the last player for 1200ms while cards
+  remain clickable, so the human can accidentally queue a 5th card into the
+  trick. That corrupts the trick state, and by the 13th trick a hand goes empty
+  — aiPlay returns undefined — causing the crash on c.suit in renderTrick.
+
+  The fix: set G.curPlayer = -1 immediately when the trick is full so no cards
+  are clickable during the pause.
+
+● Update(ui.js)
+  ⎿  Added 1 line
+       96    G.curTrick.push({player, card});
+       97  
+       98    if (G.curTrick.length === 4) {
+       99 +    G.curPlayer = -1; // block clicks during pause            
+      100      render();
+      101      setTimeout(() => {
+      102        const trump = G.contract.suit<4 ? G.contract.suit : -1;
+
+● G.curPlayer = -1 makes no player match the clickable check (G.curPlayer ===
+  p), so no card is interactive during the 1200ms pause. G.curPlayer is then
+  correctly set to the trick winner inside the timeout.
+
+✻ Crunched for 1m 57s
+
+❯ it sometimes shows "undefined is playing"
+
+● G.curPlayer is -1 during the trick pause, so PNAME[-1] is undefined. Just skip
+   the status update when curPlayer is -1.
+
+● Update(ui.js)
+  ⎿  Added 6 lines, removed 3 lines
+      261      el.textContent = G.curPlayer===2 ? 'Your bid (South):' : `
+           ${PNAME[G.curPlayer]} is bidding…`;
+      262    } else if (G.phase==='playing') {
+      263      const p = G.curPlayer;
+      264 -    const isNSContract = G.contract.declarer % 2 === 0;       
+      265 -    const human = p===2 || (isNSContract && p===0);           
+      266 -    el.textContent = human ? 'Your turn — click a card' : `${P
+          -NAME[p]} is playing…`;                                        
+      264 +    if (p === -1) { el.textContent = ''; }                    
+      265 +    else {                                                    
+      266 +      const isNSContract = G.contract.declarer % 2 === 0;     
+      267 +      const human = p===2 || (isNSContract && p===0);         
+      268 +      el.textContent = human ? 'Your turn — click a card' : `$
+          +{PNAME[p]} is playing…`;                                      
+      269 +    }                                                         
+      270    } else {
+      271      el.textContent='';
+      272    }
+
+● Status message is now blank during the 1200ms trick pause instead of showing
+  "undefined is playing…".
+
+✻ Cogitated for 14s
+
+❯ north should autoplay when east or west is declarer
+
+● Let me read the current advancePlay and aiPlay to understand the full picture.
+
+  Read 2 files (ctrl+o to expand)
+
+● Found it: if advancePlay is ever called while G.curPlayer is -1 (the
+  trick-pause sentinel we added), it passes -1 to aiPlay, which does
+  state.hands[-1] → undefined, then [...undefined] → TypeError. That breaks the
+  setTimeout chain and the next player never fires — which would look like North
+   hanging when it's their turn.
+
+  The fix is a guard at the top of advancePlay, plus a defensive check on the
+  aiPlay return value:
+
+● Update(ui.js)
+  ⎿  Added 2 lines
+      84  function advancePlay() {
+      85    if (G.phase !== 'playing') return;
+      86    const p = G.curPlayer;
+      87 +  if (p < 0) return; // trick-pause sentinel, ignore stale time
+         +outs                                                           
+      88    const isNSContract = G.contract.declarer % 2 === 0;
+      89    const humanTurn = p===2 || (isNSContract && p===0);
+      90    if (humanTurn) { render(); return; }
+      91    const c = aiPlay(G, p);
+      92 +  if (!c) return;                                              
+      93    applyPlay(p, c);
+      94  }
+      95  
+
+● Also guard aiPlay itself against an empty hand:
+
+● Update(bridge.js)
+  ⎿  Added 1 line
+      212      const onSuit = sSuit(h, led);
+      213      legal = onSuit.length > 0 ? onSuit : [...h];
+      214    }
+      215 +  if (legal.length === 0) return null;                        
+      216    if (legal.length === 1) return legal[0];
+      217  
+      218    // Opening lead
+● The root cause: a stale setTimeout(advancePlay) firing during the 1200 ms
+  trick-pause (when curPlayer is -1) would call aiPlay(G, -1), crash on
+  state.hands[-1], and silently break the play chain — leaving the next player
+  (often North) appearing to hang. The p < 0 guard short-circuits that before
+  any damage is done.
+
+✻ Worked for 6m 10s
+
+❯ when north is declarer show north's cards during play
+
+● isHandVisible only reveals North as dummy, not as declarer. Need one more
+  condition:
+
+● Update(ui.js)
+  ⎿  Added 1 line
+       8    if (showAll) return true;
+       9    if (p === 2) return true; // South always visible
+      10    if (G.phase === 'playing' && p === G.dummy) return true; // d
+          ummy face-up
+      11 +  if (G.phase === 'playing' && p === 0 && G.contract?.declarer 
+         +=== 0) return true; // North declarer                          
+      12    return false;
+      13  }
+      14  
+
+● North's cards are now face-up whenever North is the declarer, matching how
+  South's cards are always visible when South declares.
+
+✻ Crunched for 17s
+
+❯ Norths cards are not showing during play when north is declarer
+
+● Let me read the actual current state of the file to verify the edit landed
+  correctly:
+
+  Read 1 file (ctrl+o to expand)
+
+● The condition exists in the code but let me read the exact current
+  isHandVisible and trace through carefully:
+
+  Read 1 file (ctrl+o to expand)
+
+● The condition is there but G.contract?.declarer === 0 only shows North when
+  North is exactly the declarer. If findDeclarer somehow returns -1 (a
+  degenerate auction), or if the optional-chain returns unexpected, North stays
+  hidden. A cleaner fix: restructure with an explicit null guard and use % 2 ===
+   0 to cover the full NS-declares case:
+
+● Update(ui.js)
+  ⎿  Added 3 lines, removed 2 lines
+       7  function isHandVisible(p) {
+       8    if (showAll) return true;
+       9    if (p === 2) return true; // South always visible
+      10 -  if (G.phase === 'playing' && p === G.dummy) return true; // d
+         -ummy face-up                                                   
+      11 -  if (G.phase === 'playing' && p === 0 && G.contract?.declarer 
+         -=== 0) return true; // North declarer                          
+      10 +  if (G.phase !== 'playing' || !G.contract) return false;      
+      11 +  if (p === G.dummy) return true; // dummy face-up             
+      12 +  if (p === 0 && G.contract.declarer % 2 === 0) return true; //
+         + North when NS declares                                        
+      13    return false;
+      14  }
+      15  
+
+● Also apply the same logic consistently in renderHands for the clickable/dummy
+  checks:
+
+  Read 1 file (ctrl+o to expand)
+
+● Update(ui.js)
+  ⎿  Added 1 line, removed 1 line
+      175        d.style.color = SCOL[c.suit];
+      176        d.textContent = cstr(c);
+      177  
+      178 -      const isNSContract = G.contract?.declarer % 2 === 0;    
+      178 +      const isNSContract = G.contract && G.contract.declarer %
+          + 2 === 0;                                                     
+      179        const isDummy = G.phase==='playing' && p===G.dummy;
+      180        const isHumanCard = G.phase==='playing' && G.curPlayer==
+           =p && (p===2 || (isNSContract && p===0));
+      181  
+
+● Key changes:
+  - isHandVisible now explicitly guards !G.contract before touching .declarer,
+  avoiding any optional-chain edge cases
+  - Uses declarer % 2 === 0 instead of === 0 so North is shown whenever NS has
+  the contract, not only when declarer is exactly 0
+  - Same explicit null guard applied to the isNSContract check in renderHands
+
+✻ Churned for 5m 25s
+
+❯ undo that change
+
+● Update(ui.js)
+  ⎿  Added 2 lines, removed 3 lines
+       7  function isHandVisible(p) {
+       8    if (showAll) return true;
+       9    if (p === 2) return true; // South always visible
+      10 -  if (G.phase !== 'playing' || !G.contract) return false;      
+      11 -  if (p === G.dummy) return true; // dummy face-up             
+      12 -  if (p === 0 && G.contract.declarer % 2 === 0) return true; //
+         - North when NS declares                                        
+      10 +  if (G.phase === 'playing' && p === G.dummy) return true; // d
+         +ummy face-up                                                   
+      11 +  if (G.phase === 'playing' && p === 0 && G.contract?.declarer 
+         +=== 0) return true; // North declarer                          
+      12    return false;
+      13  }
+      14  
+
+● Update(ui.js)
+  ⎿  Added 1 line, removed 1 line
+      174        d.style.color = SCOL[c.suit];
+      175        d.textContent = cstr(c);
+      176  
+      177 -      const isNSContract = G.contract && G.contract.declarer %
+          - 2 === 0;                                                     
+      177 +      const isNSContract = G.contract?.declarer % 2 === 0;    
+      178        const isDummy = G.phase==='playing' && p===G.dummy;
+      179        const isHumanCard = G.phase==='playing' && G.curPlayer==
+           =p && (p===2 || (isNSContract && p===0));
+      180  
+
+● Done, reverted.
+
+✻ Cooked for 14s
+
+❯ /export chat.txt
+  ⎿  Conversation exported to: /home/vagrant/src/moellep/bridge/chat.txt
+
+❯ replace em dashes with -
+
+  Searched for 1 pattern (ctrl+o to expand)
+● Bash(sed -i 's/—/-/g' /home/vagrant/src/moellep/bridge/ui.js
+      /home/vagrant/src/moellep/bridge/index.html)
+  ⎿  (No output)
+
+● Done. Also noticed the user added console.log statements to ui.js for
+  debugging — leaving those as-is since that was intentional.
+
+✻ Cooked for 23s
+
+❯ ascii only input files
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+● Bash(# Replace box-drawing dashes and section dividers
+      sed -i 's/──/--/g; s/─/-/g' /home/vagrant/src/moellep/bridge/bridge.js
+      /home/vagrant/src/moellep/bridge/ui.js…)
+  ⎿  Interrupted · What should Claude do instead?

@@ -1,6 +1,6 @@
 'use strict';
 
-// ── Game state ─────────────────────────────────────────────────────────────────
+// -- Game state -----------------------------------------------------------------
 let G = null;
 let showAll = false;
 
@@ -8,6 +8,7 @@ function isHandVisible(p) {
   if (showAll) return true;
   if (p === 2) return true; // South always visible
   if (G.phase === 'playing' && p === G.dummy) return true; // dummy face-up
+  if (G.phase === 'playing' && p === 0 && G.contract?.declarer === 0) return true; // North declarer
   return false;
 }
 
@@ -39,7 +40,7 @@ function newGame() {
   setTimeout(advanceBid, 400);
 }
 
-// ── Bidding flow ───────────────────────────────────────────────────────────────
+// -- Bidding flow ---------------------------------------------------------------
 function advanceBid() {
   if (G.phase !== 'bidding') return;
   if (G.curPlayer === 2) { render(); return; }
@@ -63,7 +64,7 @@ function applyBid(player, bid) {
 
 function endAuction(high) {
   if (!high) {
-    G.msg = 'All pass — redealing...';
+    G.msg = 'All pass - redealing...';
     render();
     setTimeout(newGame, 1800);
     return;
@@ -80,14 +81,16 @@ function endAuction(high) {
   setTimeout(advancePlay, 900);
 }
 
-// ── Card play flow ─────────────────────────────────────────────────────────────
+// -- Card play flow -------------------------------------------------------------
 function advancePlay() {
   if (G.phase !== 'playing') return;
   const p = G.curPlayer;
+  if (p < 0) return; // trick-pause sentinel, ignore stale timeouts
   const isNSContract = G.contract.declarer % 2 === 0;
   const humanTurn = p===2 || (isNSContract && p===0);
   if (humanTurn) { render(); return; }
   const c = aiPlay(G, p);
+  if (!c) return;
   applyPlay(p, c);
 }
 
@@ -132,18 +135,18 @@ function endGame() {
     const over = made-need;
     showMessage(
       `Contract Made!`,
-      `${level}${sStr} by ${declN} — made ${made} tricks${over?` (+${over} overtrick${over>1?'s':''})`:''}\n+${Math.abs(pts)} points to ${isNS?'NS':'EW'}`
+      `${level}${sStr} by ${declN} - made ${made} tricks${over?` (+${over} overtrick${over>1?'s':''})`:''}\n+${Math.abs(pts)} points to ${isNS?'NS':'EW'}`
     );
   } else {
     showMessage(
       `Down ${need-made}`,
-      `${level}${sStr} by ${declN} — only ${made} tricks needed ${need}\n${Math.abs(pts)} points to ${isNS?'EW':'NS'}`
+      `${level}${sStr} by ${declN} - only ${made} tricks needed ${need}\n${Math.abs(pts)} points to ${isNS?'EW':'NS'}`
     );
   }
   render();
 }
 
-// ── Rendering ──────────────────────────────────────────────────────────────────
+// -- Rendering ------------------------------------------------------------------
 function render() {
   renderHands();
   renderTrick();
@@ -265,7 +268,7 @@ function renderStatus() {
     else {
       const isNSContract = G.contract.declarer % 2 === 0;
       const human = p===2 || (isNSContract && p===0);
-      el.textContent = human ? 'Your turn — click a card' : `${PNAME[p]} is playing…`;
+      el.textContent = human ? 'Your turn - click a card' : `${PNAME[p]} is playing…`;
     }
   } else {
     el.textContent='';
@@ -287,7 +290,7 @@ function updateScores() {
   document.getElementById('ew-score').textContent = G.scoresEW;
 }
 
-// ── Event handlers ─────────────────────────────────────────────────────────────
+// -- Event handlers -------------------------------------------------------------
 function humanBid(level, suit) {
   if (G.phase!=='bidding'||G.curPlayer!==2) return;
   document.getElementById('bid-box').style.display='none';
@@ -349,7 +352,7 @@ function dismissMessage() {
   newGame();
 }
 
-// ── Init ───────────────────────────────────────────────────────────────────────
+// -- Init -----------------------------------------------------------------------
 document.getElementById('new-game-btn').addEventListener('click', newGame);
 document.getElementById('show-all-cb').addEventListener('change', e => { showAll = e.target.checked; render(); });
 newGame();

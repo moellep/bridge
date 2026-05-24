@@ -1,6 +1,6 @@
 'use strict';
 
-// ── Constants ──────────────────────────────────────────────────────────────────
+// -- Constants ------------------------------------------------------------------
 const SYM   = ['♣','♦','♥','♠'];
 const SNAME = ['Clubs','Diamonds','Hearts','Spades','NT'];
 const SCOL  = ['#222','#c00','#c00','#222'];
@@ -8,7 +8,7 @@ const RNAME = ['','','2','3','4','5','6','7','8','9','10','J','Q','K','A'];
 const PNAME = ['North','East','South','West'];
 // Player indices: N=0 E=1 S=2 W=3   Suits: ♣=0 ♦=1 ♥=2 ♠=3 NT=4
 
-// ── Card utilities ─────────────────────────────────────────────────────────────
+// -- Card utilities -------------------------------------------------------------
 const card  = (rank, suit) => ({rank, suit});
 const cstr  = c => RNAME[c.rank] + SYM[c.suit];
 const hcp   = c => c.rank >= 11 ? c.rank - 10 : 0;
@@ -28,7 +28,7 @@ function isBalanced(h) {
   return lens[0] >= 2;
 }
 
-// ── Deck ───────────────────────────────────────────────────────────────────────
+// -- Deck -----------------------------------------------------------------------
 function makeDeck() {
   const d = [];
   for (let s=0;s<4;s++) for(let r=2;r<=14;r++) d.push(card(r,s));
@@ -46,7 +46,7 @@ function sortHand(h) {
   return [...h].sort((a,b) => a.suit!==b.suit ? b.suit-a.suit : b.rank-a.rank);
 }
 
-// ── Bid utilities ──────────────────────────────────────────────────────────────
+// -- Bid utilities --------------------------------------------------------------
 // ROM encoding: bid_value = (level-1)*8 + suit  (♣=0 ♦=1 ♥=2 ♠=3 NT=4)
 const bVal  = b => b.pass ? -1 : (b.level-1)*8 + b.suit;
 const beats = (b, cur) => !cur || bVal(b) > bVal(cur);
@@ -67,7 +67,7 @@ function findDeclarer(auction, suit, side) {
   return -1;
 }
 
-// ── AI: hand evaluation helpers ────────────────────────────────────────────────
+// -- AI: hand evaluation helpers ------------------------------------------------
 function bestSuit(h) {
   let best=-1, bLen=0, bHCP=0;
   for(let s=3;s>=0;s--) {
@@ -77,7 +77,7 @@ function bestSuit(h) {
   return best;
 }
 
-// ── AI bidding (faithful to ROM thresholds) ────────────────────────────────────
+// -- AI bidding (faithful to ROM thresholds) ------------------------------------
 function aiBid(state, player) {
   const h    = state.hands[player];
   const myHP = hHCP(h);
@@ -196,7 +196,7 @@ function aiBid(state, player) {
   return PASS();
 }
 
-// ── Card play AI ───────────────────────────────────────────────────────────────
+// -- Card play AI ---------------------------------------------------------------
 function aiPlay(state, player) {
   const h      = state.hands[player];
   const trick  = state.curTrick;
@@ -212,6 +212,7 @@ function aiPlay(state, player) {
     const onSuit = sSuit(h, led);
     legal = onSuit.length > 0 ? onSuit : [...h];
   }
+  if (legal.length === 0) return null;
   if (legal.length === 1) return legal[0];
 
   // Opening lead
@@ -270,7 +271,7 @@ function trickWinner(trick, trump) {
   return win.player;
 }
 
-// ── Scoring ────────────────────────────────────────────────────────────────────
+// -- Scoring --------------------------------------------------------------------
 function scoreContract(contract, tricksMade, vulnerable) {
   const {level, suit, declarer} = contract;
   const isNS  = declarer%2===0;
